@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "outDir": "dist"
+  },
+  "include": ["scripts/**/*", "src/lib/svg-parser.ts", "src/lib/svg-colours.ts"]
+}

@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed": "ts-node --project tsconfig.scripts.json scripts/seed.ts"
+    "seed": "ts-node --project tsconfig.scripts.json scripts/seed.ts",
+    "reseed": "ts-node --project tsconfig.scripts.json scripts/reseed.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",

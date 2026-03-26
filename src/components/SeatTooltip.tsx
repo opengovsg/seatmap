@@ -1,17 +1,11 @@
 import { createPortal } from 'react-dom'
 import type { Seat } from '@/types'
-import { Badge } from '@/components/ui/badge'
+import { STATUS_COLOURS } from './SeatMap'
 
-const STATUS_LABELS = {
+const STATUS_LABELS: Record<string, string> = {
   AVAILABLE: 'Available',
-  OCCUPIED: 'Occupied',
-  RESERVED: 'Reserved',
-}
-
-const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  AVAILABLE: 'default',
-  OCCUPIED: 'destructive',
-  RESERVED: 'secondary',
+  OCCUPIED:  'Occupied',
+  RESERVED:  'Reserved',
 }
 
 interface SeatTooltipProps {
@@ -37,9 +31,12 @@ export function SeatTooltip({ seat, x, y }: SeatTooltipProps) {
     >
       <div className="flex items-center justify-between gap-3 mb-1">
         <span className="font-semibold">{seat.label}</span>
-        <Badge variant={STATUS_VARIANTS[seat.status]}>
+        <span
+          className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium text-white"
+          style={{ backgroundColor: STATUS_COLOURS[seat.status] }}
+        >
           {STATUS_LABELS[seat.status]}
-        </Badge>
+        </span>
       </div>
       {seat.occupant_name && (
         <div className="mt-1">

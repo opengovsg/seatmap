@@ -6,7 +6,7 @@ import { SeatTooltip } from './SeatTooltip'
 
 export const STATUS_COLOURS: Record<SeatStatus, string> = {
   AVAILABLE: '#22c55e',
-  OCCUPIED:  '#ef4444',
+  OCCUPIED:  '#39434b',
   RESERVED:  '#f59e0b',
 }
 

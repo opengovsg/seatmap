@@ -14,9 +14,9 @@ import {
 import { Search, X } from 'lucide-react'
 
 const STAT_COLOURS: Record<SeatStatus, string> = {
-  OCCUPIED:  '#39434b',
-  AVAILABLE: '#037f52',
-  RESERVED:  '#d67305',
+  OCCUPIED:  '#ef4444',
+  AVAILABLE: '#22c55e',
+  RESERVED:  '#f59e0b',
 }
 
 interface NavBarProps {

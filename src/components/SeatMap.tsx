@@ -5,9 +5,9 @@ import type { Seat, SeatStatus } from '@/types'
 import { SeatTooltip } from './SeatTooltip'
 
 export const STATUS_COLOURS: Record<SeatStatus, string> = {
-  AVAILABLE: '#037f52',
-  OCCUPIED:  '#39434b',
-  RESERVED:  '#d67305',
+  AVAILABLE: '#22c55e',
+  OCCUPIED:  '#ef4444',
+  RESERVED:  '#f59e0b',
 }
 
 // Memoized so React won't re-render (and won't reset SVG fills) when tooltip state changes

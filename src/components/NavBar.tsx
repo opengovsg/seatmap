@@ -14,7 +14,7 @@ import {
 import { Search, X } from 'lucide-react'
 
 const STAT_COLOURS: Record<SeatStatus, string> = {
-  OCCUPIED:  '#39434b',
+  OCCUPIED:  '#848f99',
   AVAILABLE: '#22c55e',
   RESERVED:  '#f59e0b',
 }

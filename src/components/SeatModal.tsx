@@ -66,7 +66,7 @@ function AssignForm({ name, onName, team, onTeam, notes, onNotes, teams, isPendi
         <Label htmlFor="assign-notes">Notes</Label>
         <Input id="assign-notes" value={notes} onChange={e => onNotes(e.target.value)} placeholder="Optional" />
       </div>
-      <Button size="sm" disabled={isPending || !name.trim()} onClick={onSubmit} className="mt-1">
+      <Button size="lg" disabled={isPending || !name.trim()} onClick={onSubmit} className="mt-1 w-full">
         {isPending ? 'Saving…' : 'Assign'}
       </Button>
     </div>
@@ -89,7 +89,7 @@ function ReserveForm({ notes, onNotes, team, onTeam, teams, isPending, onSubmit 
         <Label>Team</Label>
         <TeamCombobox value={team} onChange={onTeam} teams={teams} />
       </div>
-      <Button size="sm" disabled={isPending} onClick={onSubmit} className="mt-1">
+      <Button size="lg" disabled={isPending} onClick={onSubmit} className="mt-1 w-full">
         {isPending ? 'Saving…' : 'Reserve'}
       </Button>
     </div>
@@ -155,14 +155,14 @@ export function SeatModal({ seat, teams, onClose, onUpdated, onMoveStart }: Seat
               <TabsTrigger value="assign" className="flex-1">Assign seat</TabsTrigger>
               <TabsTrigger value="reserve" className="flex-1">Reserve seat</TabsTrigger>
             </TabsList>
-            <TabsContent value="assign">
+            <TabsContent value="assign" className="min-h-[268px]">
               <AssignForm
                 name={name} onName={setName} team={team} onTeam={setTeam}
                 notes={notes} onNotes={setNotes} teams={teams} isPending={isPending}
                 onSubmit={() => run(() => assignSeat(seat.id, name.trim(), team.trim(), notes.trim()))}
               />
             </TabsContent>
-            <TabsContent value="reserve">
+            <TabsContent value="reserve" className="min-h-[268px]">
               <ReserveForm
                 notes={notes} onNotes={setNotes} team={team} onTeam={setTeam}
                 teams={teams} isPending={isPending}
@@ -185,9 +185,9 @@ export function SeatModal({ seat, teams, onClose, onUpdated, onMoveStart }: Seat
               {seat.notes && <p className="text-muted-foreground">{seat.notes}</p>}
             </div>
             <DialogFooter>
-              <Button size="sm" onClick={enterEdit}>Edit</Button>
-              <Button size="sm" variant="outline" onClick={() => { close(); onMoveStart(seat) }}>Move</Button>
-              <Button size="sm" variant="outline" disabled={isPending}
+              <Button size="lg" onClick={enterEdit}>Edit</Button>
+              <Button size="lg" variant="outline" onClick={() => { close(); onMoveStart(seat) }}>Move</Button>
+              <Button size="lg" variant="outline" disabled={isPending}
                 onClick={() => run(() => unassignSeat(seat.id))}>Unassign</Button>
             </DialogFooter>
           </>
@@ -215,7 +215,7 @@ export function SeatModal({ seat, teams, onClose, onUpdated, onMoveStart }: Seat
               </div>
             </div>
             <DialogFooter>
-              <Button size="sm" disabled={isPending || !name.trim()}
+              <Button size="lg" disabled={isPending || !name.trim()}
                 onClick={() => run(() => updateSeat(seat.id, {
                   label: label.trim() || undefined,
                   occupant_name: name.trim(),
@@ -224,7 +224,7 @@ export function SeatModal({ seat, teams, onClose, onUpdated, onMoveStart }: Seat
                 }))}>
                 {isPending ? 'Saving…' : 'Save'}
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => setMode('view')}>Back</Button>
+              <Button size="lg" variant="ghost" onClick={() => setMode('view')}>Back</Button>
             </DialogFooter>
           </>
         )}
@@ -236,8 +236,8 @@ export function SeatModal({ seat, teams, onClose, onUpdated, onMoveStart }: Seat
               {seat.notes && <p className="text-muted-foreground">{seat.notes}</p>}
             </div>
             <DialogFooter>
-              <Button size="sm" onClick={enterAssign}>Assign person</Button>
-              <Button size="sm" variant="outline" disabled={isPending}
+              <Button size="lg" onClick={enterAssign}>Assign person</Button>
+              <Button size="lg" variant="outline" disabled={isPending}
                 onClick={() => run(() => makeAvailable(seat.id))}>Make available</Button>
             </DialogFooter>
           </>
@@ -251,7 +251,7 @@ export function SeatModal({ seat, teams, onClose, onUpdated, onMoveStart }: Seat
               notes={notes} onNotes={setNotes} teams={teams} isPending={isPending}
               onSubmit={() => run(() => assignSeat(seat.id, name.trim(), team.trim(), notes.trim()))}
             />
-            <Button size="sm" variant="ghost" className="mt-1" onClick={() => setMode('view')}>Back</Button>
+            <Button size="lg" variant="ghost" className="mt-1" onClick={() => setMode('view')}>Back</Button>
           </>
         )}
       </DialogContent>

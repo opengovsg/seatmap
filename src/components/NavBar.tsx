@@ -9,14 +9,14 @@ import {
 } from '@/components/ui/select'
 import {
   Combobox, ComboboxInput, ComboboxContent,
-  ComboboxList, ComboboxItem, ComboboxEmpty,
+  ComboboxList, ComboboxItem,
 } from '@/components/ui/combobox'
 import { Search, X } from 'lucide-react'
 
 const STAT_COLOURS: Record<SeatStatus, string> = {
-  OCCUPIED:  '#ef4444',
-  AVAILABLE: '#22c55e',
-  RESERVED:  '#f59e0b',
+  OCCUPIED:  '#39434b',
+  AVAILABLE: '#037f52',
+  RESERVED:  '#d67305',
 }
 
 interface NavBarProps {
@@ -79,6 +79,7 @@ export function NavBar({
       {teams.length > 0 && (
         <div className="w-[180px]">
           <Combobox
+            items={teams}
             value={teamFilter ?? null}
             onValueChange={(v) => onTeamFilterChange(v ?? null)}
           >
@@ -90,10 +91,9 @@ export function NavBar({
             />
             <ComboboxContent>
               <ComboboxList>
-                {teams.map((t) => (
+                {(t: string) => (
                   <ComboboxItem key={t} value={t}>{t}</ComboboxItem>
-                ))}
-                <ComboboxEmpty>No teams found</ComboboxEmpty>
+                )}
               </ComboboxList>
             </ComboboxContent>
           </Combobox>
@@ -123,10 +123,10 @@ export function NavBar({
       <div className="flex-1" />
 
       {/* Stats */}
-      <div className="flex items-center gap-3 text-sm text-muted-foreground">
-        <StatPill colour={STAT_COLOURS.OCCUPIED}  label="occupied"  count={occupied}  />
-        <StatPill colour={STAT_COLOURS.AVAILABLE} label="available" count={available} />
-        <StatPill colour={STAT_COLOURS.RESERVED}  label="reserved"  count={reserved}  />
+      <div className="flex items-center gap-3 text-sm">
+        <StatPill colour={STAT_COLOURS.OCCUPIED}  count={occupied}  />
+        <StatPill colour={STAT_COLOURS.AVAILABLE} count={available} />
+        <StatPill colour={STAT_COLOURS.RESERVED}  count={reserved}  />
       </div>
 
       {/* Audit log */}
@@ -145,12 +145,11 @@ export function NavBar({
   )
 }
 
-function StatPill({ colour, label, count }: { colour: string; label: string; count: number }) {
+function StatPill({ colour, count }: { colour: string; count: number }) {
   return (
     <span className="flex items-center gap-1.5">
       <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: colour }} />
-      <span className="font-medium text-foreground">{count}</span>
-      <span>{label}</span>
+      <span className="font-medium tabular-nums">{count}</span>
     </span>
   )
 }

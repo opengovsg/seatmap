@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger,
 } from '@/components/ui/select'
 import {
   Combobox, ComboboxInput, ComboboxContent,
@@ -106,7 +106,11 @@ export function NavBar({
         onValueChange={(v) => onStatusChange(v === '__all__' ? null : v as SeatStatus)}
       >
         <SelectTrigger className="h-9 text-sm w-[140px]">
-          <SelectValue />
+          <span className="flex flex-1 text-left text-sm">
+            {statusFilter === null      ? 'Show all'  :
+             statusFilter === 'OCCUPIED'  ? 'Occupied'  :
+             statusFilter === 'AVAILABLE' ? 'Available' : 'Reserved'}
+          </span>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="__all__">Show all</SelectItem>

@@ -15,7 +15,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Search, X, ChevronDown } from 'lucide-react'
+import { Search, X, MoreHorizontal } from 'lucide-react'
 
 const STAT_COLOURS: Record<SeatStatus, string> = {
   OCCUPIED:  '#848f99',
@@ -135,14 +135,12 @@ export function NavBar({
 
       {/* User menu */}
       <DropdownMenu>
-        <DropdownMenuTrigger className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors outline-none">
-          <span className="hidden sm:inline">{userEmail}</span>
-          <ChevronDown className="size-3.5" />
+        <DropdownMenuTrigger className="flex items-center justify-center size-8 rounded-md hover:bg-muted transition-colors outline-none">
+          <MoreHorizontal className="size-4 text-muted-foreground" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
           <div className="px-2 py-1.5 text-xs text-muted-foreground truncate">{userEmail}</div>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => router.push('/audit')}>Audit log</DropdownMenuItem>
           <DropdownMenuItem onClick={() => router.push('/admin')}>Admin</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleSignOut}>Log out</DropdownMenuItem>

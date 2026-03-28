@@ -8,6 +8,7 @@ import type { Seat, Floor, SeatStatus } from '@/types'
 import { moveSeat, restoreSeat } from '@/app/actions/seats'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import { FileEdit } from 'lucide-react'
 
 function toastTimestamp() {
   return new Date().toLocaleString('en-US', {
@@ -23,9 +24,11 @@ interface MapClientProps {
   teams:        string[]
   divisions:    string[]
   userEmail:    string
+  isDraft:      boolean
+  userIsAdmin:  boolean
 }
 
-export function MapClient({ floor, initialSeats, teams, divisions, userEmail }: MapClientProps) {
+export function MapClient({ floor, initialSeats, teams, divisions, userEmail, isDraft, userIsAdmin }: MapClientProps) {
   const [seats,        setSeats]        = useState<Seat[]>(initialSeats)
   const [selectedSeat, setSelectedSeat] = useState<Seat | null>(null)
   const [movingFrom,   setMovingFrom]   = useState<Seat | null>(null)
@@ -68,9 +71,36 @@ export function MapClient({ floor, initialSeats, teams, divisions, userEmail }: 
   // ── Seat interactions ────────────────────────────────────────────────────────
   const refreshSeats = useCallback(async () => {
     const supabase = createClient()
-    const { data } = await supabase.from('seats').select('*').order('label')
-    if (data) setSeats(data as Seat[])
-  }, [])
+    if (isDraft) {
+      const [{ data }, { data: svgRectRows }] = await Promise.all([
+        supabase
+          .from('seat_drafts')
+          .select('seat_id, floor_id, label, status, occupant_name, occupant_team, occupant_division, notes')
+          .eq('floor_id', floor.id)
+          .order('label'),
+        supabase.from('seats').select('id, svg_rect_id').eq('floor_id', floor.id),
+      ])
+      const svgRectMap = new Map((svgRectRows ?? []).map((r) => [r.id, r.svg_rect_id]))
+      if (data) setSeats(data.map((r) => {
+        const row = r as unknown as Record<string, string | null>
+        return {
+          id:                row.seat_id,
+          floor_id:          row.floor_id,
+          svg_rect_id:       svgRectMap.get(row.seat_id ?? '') ?? '',
+          label:             row.label,
+          status:            row.status,
+          occupant_name:     row.occupant_name,
+          occupant_team:     row.occupant_team,
+          occupant_division: row.occupant_division,
+          notes:             row.notes,
+          created_at:        '',
+        } as unknown as Seat
+      }))
+    } else {
+      const { data } = await supabase.from('seats').select('*').order('label')
+      if (data) setSeats(data as Seat[])
+    }
+  }, [isDraft, floor.id])
 
   const handleSeatClick = useCallback((seat: Seat) => {
     if (movingFrom) {
@@ -133,6 +163,18 @@ export function MapClient({ floor, initialSeats, teams, divisions, userEmail }: 
         divisionFilter={divisionFilter}
         onDivisionFilterChange={setDivisionFilter}
       />
+
+      {isDraft && (
+        <div className="bg-blue-50 border-b border-blue-200 px-4 py-2 text-sm text-blue-800 flex items-center gap-2">
+          <FileEdit className="size-3.5 shrink-0" />
+          <span>
+            Draft mode — edits are not live yet.
+            {userIsAdmin
+              ? <> Go to <a href="/admin" className="underline font-medium">Admin</a> to publish or discard.</>
+              : ' An admin must publish changes before they go live.'}
+          </span>
+        </div>
+      )}
 
       {movingFrom && (
         <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-sm text-amber-800 flex items-center justify-between">

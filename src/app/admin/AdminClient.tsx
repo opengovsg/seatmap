@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-table'
 import { uploadFloor, restoreSnapshot, listSnapshots } from '@/app/actions/floor'
 import { addAdminAction, removeAdminAction, transferOwnershipAction, listAdminsAction } from '@/app/actions/admins'
+import { initializeDraft, publishDraft, discardDraft } from '@/app/actions/draft'
 import type { UploadResult, Snapshot } from '@/app/actions/floor'
 import type { AdminRecord, AdminRole } from '@/lib/admins'
 import type { AuditLog } from '@/types'
@@ -96,9 +97,12 @@ interface Props {
   initialAdmins: AdminRecord[]
   userEmail: string
   userRole: AdminRole
+  isDraft: boolean
+  draftSeatCount: number
+  floorId: string
 }
 
-export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, userEmail, userRole }: Props) {
+export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, userEmail, userRole, isDraft: initialIsDraft, draftSeatCount: initialDraftSeatCount, floorId }: Props) {
   const fileRef                           = useRef<HTMLInputElement>(null)
   const [snapshots, setSnapshots]         = useState<Snapshot[]>(initialSnapshots)
   const [uploadResult, setUploadResult]   = useState<UploadResult | null>(null)
@@ -108,6 +112,52 @@ export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, user
   const [isPending, startTransition]      = useTransition()
   const [globalFilter, setGlobalFilter]   = useState('')
   const [sorting, setSorting]             = useState<SortingState>([{ id: 'created_at', desc: true }])
+
+  // ── Draft state ──
+  const [isDraft, setIsDraft]             = useState(initialIsDraft)
+  const [draftSeatCount]                  = useState(initialDraftSeatCount)
+  const [draftError, setDraftError]       = useState<string | null>(null)
+  const [draftConfirm, setDraftConfirm]   = useState<'publish' | 'discard' | null>(null)
+
+  function handleInitDraft() {
+    setDraftError(null)
+    startTransition(async () => {
+      try {
+        await initializeDraft(floorId)
+        setIsDraft(true)
+      } catch (err) {
+        setDraftError(err instanceof Error ? err.message : 'Failed to start draft.')
+      }
+    })
+  }
+
+  function handlePublishDraft() {
+    setDraftError(null)
+    startTransition(async () => {
+      try {
+        await publishDraft(floorId)
+        setIsDraft(false)
+        setDraftConfirm(null)
+      } catch (err) {
+        setDraftError(err instanceof Error ? err.message : 'Publish failed.')
+        setDraftConfirm(null)
+      }
+    })
+  }
+
+  function handleDiscardDraft() {
+    setDraftError(null)
+    startTransition(async () => {
+      try {
+        await discardDraft(floorId)
+        setIsDraft(false)
+        setDraftConfirm(null)
+      } catch (err) {
+        setDraftError(err instanceof Error ? err.message : 'Discard failed.')
+        setDraftConfirm(null)
+      }
+    })
+  }
 
   // ── Admins state ──
   const [admins, setAdmins]               = useState<AdminRecord[]>(initialAdmins)
@@ -222,6 +272,59 @@ export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, user
 
   return (
     <div className="flex flex-col gap-8">
+
+      {/* ── Draft seating ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Draft seating</CardTitle>
+          <CardDescription>
+            Start a draft to let users rearrange seats without affecting the live map.
+            Publish when ready, or discard to abandon changes.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          {!isDraft ? (
+            <Button onClick={handleInitDraft} disabled={isPending} className="w-fit">
+              {isPending ? 'Starting…' : 'Start draft'}
+            </Button>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground">
+                Draft is active — <strong className="text-foreground">{draftSeatCount} seats</strong> in draft.
+                Users can edit seats. Changes are not live until published.
+              </p>
+              {draftConfirm === 'publish' ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Publish draft and replace live seating?</span>
+                  <Button size="sm" disabled={isPending} onClick={handlePublishDraft}>
+                    {isPending ? 'Publishing…' : 'Yes, publish'}
+                  </Button>
+                  <Button size="sm" variant="ghost" disabled={isPending} onClick={() => setDraftConfirm(null)}>Cancel</Button>
+                </div>
+              ) : draftConfirm === 'discard' ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Discard draft? All draft edits will be lost.</span>
+                  <Button size="sm" variant="destructive" disabled={isPending} onClick={handleDiscardDraft}>
+                    {isPending ? 'Discarding…' : 'Yes, discard'}
+                  </Button>
+                  <Button size="sm" variant="ghost" disabled={isPending} onClick={() => setDraftConfirm(null)}>Cancel</Button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Button size="sm" disabled={isPending} onClick={() => setDraftConfirm('publish')}>Publish draft</Button>
+                  <Button size="sm" variant="outline" disabled={isPending} onClick={() => setDraftConfirm('discard')}>Discard draft</Button>
+                </div>
+              )}
+            </>
+          )}
+          {draftError && (
+            <div className="flex items-center gap-2 text-sm text-destructive">
+              <AlertTriangle className="size-4 shrink-0" />
+              {draftError}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* ── Audit log ── */}
       <Card>

@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { listSnapshots } from '@/app/actions/floor'
 import { isAdmin, listAdmins } from '@/lib/admins'
+import { getDraftState } from '@/app/actions/draft'
 import { AdminClient } from './AdminClient'
 import type { AuditLog } from '@/types'
 
@@ -16,7 +17,7 @@ export default async function AdminPage() {
 
   const db = createAdminClient()
 
-  const [snapshots, { data: logs }, admins] = await Promise.all([
+  const [snapshots, { data: logs }, admins, isDraft, { data: floor }] = await Promise.all([
     listSnapshots(),
     db
       .from('audit_logs')
@@ -24,9 +25,16 @@ export default async function AdminPage() {
       .order('created_at', { ascending: false })
       .limit(200),
     listAdmins(),
+    getDraftState(),
+    db.from('floors').select('id').single(),
   ])
 
   const userRole = admins.find(a => a.email === email)?.role ?? 'admin'
+
+  // Count how many seats are in the draft if active
+  const draftSeatCount = isDraft && floor
+    ? await db.from('seat_drafts').select('seat_id', { count: 'exact', head: true }).eq('floor_id', floor.id).then(r => r.count ?? 0)
+    : 0
 
   return (
     <div className="min-h-svh bg-background">
@@ -43,6 +51,9 @@ export default async function AdminPage() {
           initialAdmins={admins}
           userEmail={email}
           userRole={userRole}
+          isDraft={isDraft}
+          draftSeatCount={draftSeatCount}
+          floorId={floor?.id ?? ''}
         />
       </main>
     </div>

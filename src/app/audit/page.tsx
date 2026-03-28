@@ -20,17 +20,29 @@ export default async function AuditPage({ searchParams }: PageProps) {
   const offset  = (page - 1) * PAGE_SIZE
 
   const db = createAdminClient()
-  let req = db
+
+  let countReq = db.from('audit_logs').select('*', { count: 'exact', head: true })
+  let dataReq  = db
     .from('audit_logs')
-    .select('*, seat:seats(label)', { count: 'exact' })
+    .select('*')
     .order('created_at', { ascending: false })
     .range(offset, offset + PAGE_SIZE - 1)
 
   if (query) {
-    req = req.or(`editor_email.ilike.%${query}%,seats.label.ilike.%${query}%`) as typeof req
+    countReq = countReq.ilike('editor_email', `%${query}%`) as typeof countReq
+    dataReq  = dataReq.ilike('editor_email',  `%${query}%`) as typeof dataReq
   }
 
-  const { data: logs, count } = await req
+  const [{ count }, { data: rawLogs }] = await Promise.all([countReq, dataReq])
+
+  // Fetch seat labels separately (FK was dropped to preserve history across restores)
+  const seatIds = [...new Set((rawLogs ?? []).map(l => l.seat_id as string).filter(Boolean))]
+  const { data: seatRows } = seatIds.length > 0
+    ? await db.from('seats').select('id, label').in('id', seatIds)
+    : { data: [] }
+  const seatLabelMap = new Map((seatRows ?? []).map(s => [s.id, s.label]))
+  const logs = (rawLogs ?? []).map(l => ({ ...l, seat: { label: seatLabelMap.get(l.seat_id) ?? l.seat_id } }))
+
   const total = count ?? 0
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
@@ -136,6 +148,8 @@ function ActionBadge({ action }: { action: string }) {
     RESERVE:  'bg-amber-100 text-amber-800',
     MOVE:     'bg-blue-100 text-blue-800',
     UPDATE:   'bg-purple-100 text-purple-800',
+    PUBLISH:  'bg-indigo-100 text-indigo-800',
+    RESTORE:  'bg-orange-100 text-orange-800',
   }
   return (
     <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full ${styles[action] ?? 'bg-muted'}`}>

@@ -203,7 +203,8 @@ export async function restoreSnapshot(snapshotId: string): Promise<void> {
   if (auditRows.length > 0) {
     const batchSize = 100
     for (let i = 0; i < auditRows.length; i += batchSize) {
-      await db.from('audit_logs').insert(auditRows.slice(i, i + batchSize))
+      const { error: auditError } = await db.from('audit_logs').insert(auditRows.slice(i, i + batchSize))
+      if (auditError) throw new Error('Audit log failed: ' + auditError.message)
     }
   }
 }

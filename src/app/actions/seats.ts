@@ -22,7 +22,7 @@ async function writeAudit(
   opts?: { field?: string; oldValue?: string | null; newValue?: string | null }
 ) {
   const db = createAdminClient()
-  await db.from('audit_logs').insert({
+  const { error } = await db.from('audit_logs').insert({
     seat_id: seatId,
     editor_email: editorEmail,
     action,
@@ -30,6 +30,7 @@ async function writeAudit(
     old_value: opts?.oldValue ?? null,
     new_value: opts?.newValue ?? null,
   })
+  if (error) throw new Error('Audit log failed: ' + error.message)
 }
 
 export async function assignSeat(

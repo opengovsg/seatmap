@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+
+export const dynamic = 'force-dynamic'
 import { listSnapshots } from '@/app/actions/floor'
 import { isAdmin, listAdmins } from '@/lib/admins'
 import { getDraftState } from '@/app/actions/draft'
@@ -17,17 +19,26 @@ export default async function AdminPage() {
 
   const db = createAdminClient()
 
-  const [snapshots, { data: logs }, admins, isDraft, { data: floor }] = await Promise.all([
+  const [snapshots, logsResult, admins, isDraft, { data: floor }] = await Promise.all([
     listSnapshots(),
     db
       .from('audit_logs')
-      .select('*, seat:seats(label)')
+      .select('*')
       .order('created_at', { ascending: false })
       .limit(200),
     listAdmins(),
     getDraftState(),
     db.from('floors').select('id').single(),
   ])
+
+  // Fetch seat labels separately and merge
+  const rawLogs = logsResult.data ?? []
+  const seatIds = [...new Set(rawLogs.map(l => l.seat_id as string).filter(Boolean))]
+  const { data: seatRows } = seatIds.length > 0
+    ? await db.from('seats').select('id, label').in('id', seatIds)
+    : { data: [] }
+  const seatLabelMap = new Map((seatRows ?? []).map(s => [s.id, s.label]))
+  const logs = rawLogs.map(l => ({ ...l, seat: { label: seatLabelMap.get(l.seat_id) ?? l.seat_id } }))
 
   const userRole = admins.find(a => a.email === email)?.role ?? 'admin'
 
@@ -47,7 +58,7 @@ export default async function AdminPage() {
       <main className="max-w-5xl mx-auto px-6 py-10">
         <AdminClient
           initialSnapshots={snapshots}
-          initialLogs={(logs ?? []) as AuditLog[]}
+          initialLogs={(logs ?? []) as unknown as AuditLog[]}
           initialAdmins={admins}
           userEmail={email}
           userRole={userRole}

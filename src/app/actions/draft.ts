@@ -61,6 +61,23 @@ export async function initializeDraft(floorId: string): Promise<void> {
 export async function publishDraft(floorId: string): Promise<void> {
   await requireAdmin()
   const db = createAdminClient()
+
+  // Snapshot current live seats + SVG before overwriting
+  const [{ data: floor }, { data: liveSeats }] = await Promise.all([
+    db.from('floors').select('svg_content').eq('id', floorId).single(),
+    db.from('seats').select('*').eq('floor_id', floorId),
+  ])
+
+  if (!floor) throw new Error('Floor not found.')
+  if (!liveSeats) throw new Error('Failed to load live seats.')
+
+  const { error: snapError } = await db.from('floor_snapshots').insert({
+    floor_id:    floorId,
+    svg_content: floor.svg_content,
+    seat_data:   liveSeats,
+  })
+  if (snapError) throw new Error('Failed to save snapshot before publishing: ' + snapError.message)
+
   const { error } = await db.rpc('publish_seat_draft', { p_floor_id: floorId })
   if (error) throw new Error(error.message)
 }

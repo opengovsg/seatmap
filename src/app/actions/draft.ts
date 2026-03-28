@@ -18,6 +18,15 @@ export async function getDraftState(): Promise<boolean> {
   return data?.is_active ?? false
 }
 
+export async function getDraftSeatCount(floorId: string): Promise<number> {
+  const db = createAdminClient()
+  const { count } = await db
+    .from('seat_drafts')
+    .select('seat_id', { count: 'exact', head: true })
+    .eq('floor_id', floorId)
+  return count ?? 0
+}
+
 export async function initializeDraft(floorId: string): Promise<void> {
   await requireAdmin()
   const db = createAdminClient()
@@ -53,7 +62,7 @@ export async function initializeDraft(floorId: string): Promise<void> {
 
   const { error: stateError } = await db
     .from('draft_state')
-    .update({ is_active: true })
+    .update({ is_active: true, started_at: new Date().toISOString() })
     .eq('id', 1)
   if (stateError) throw new Error(stateError.message)
 }
@@ -128,9 +137,15 @@ export async function discardDraft(floorId: string): Promise<void> {
     .eq('floor_id', floorId)
   if (deleteError) throw new Error(deleteError.message)
 
+  // Delete audit entries written during this draft session
+  const { data: state } = await db.from('draft_state').select('started_at').eq('id', 1).single()
+  if (state?.started_at) {
+    await db.from('audit_logs').delete().gte('created_at', state.started_at)
+  }
+
   const { error: stateError } = await db
     .from('draft_state')
-    .update({ is_active: false })
+    .update({ is_active: false, started_at: null })
     .eq('id', 1)
   if (stateError) throw new Error(stateError.message)
 }

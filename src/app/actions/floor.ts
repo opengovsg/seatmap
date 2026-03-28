@@ -104,6 +104,28 @@ export async function uploadFloor(svgContent: string): Promise<UploadResult> {
   return { kept, added: added.length, removed, snapshotId: snapshot.id }
 }
 
+// ── List audit logs ───────────────────────────────────────────────────────────
+export async function listAuditLogs() {
+  await requireAuth()
+  const db = createAdminClient()
+
+  const { data: rawLogs, error } = await db
+    .from('audit_logs')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(200)
+
+  if (error) throw new Error('Failed to load audit logs: ' + error.message)
+
+  const seatIds = [...new Set((rawLogs ?? []).map(l => l.seat_id as string).filter(Boolean))]
+  const { data: seatRows } = seatIds.length > 0
+    ? await db.from('seats').select('id, label').in('id', seatIds)
+    : { data: [] }
+  const seatLabelMap = new Map((seatRows ?? []).map(s => [s.id, s.label]))
+
+  return (rawLogs ?? []).map(l => ({ ...l, seat: { label: seatLabelMap.get(l.seat_id) ?? l.seat_id } }))
+}
+
 // ── List all snapshots ────────────────────────────────────────────────────────
 export async function listSnapshots(): Promise<Snapshot[]> {
   await requireAuth()

@@ -5,9 +5,9 @@ import {
   useReactTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel,
   flexRender, type ColumnDef, type SortingState,
 } from '@tanstack/react-table'
-import { uploadFloor, restoreSnapshot, listSnapshots } from '@/app/actions/floor'
+import { uploadFloor, restoreSnapshot, listSnapshots, listAuditLogs } from '@/app/actions/floor'
 import { addAdminAction, removeAdminAction, transferOwnershipAction, listAdminsAction } from '@/app/actions/admins'
-import { initializeDraft, publishDraft, discardDraft } from '@/app/actions/draft'
+import { initializeDraft, publishDraft, discardDraft, getDraftSeatCount } from '@/app/actions/draft'
 import type { UploadResult, Snapshot } from '@/app/actions/floor'
 import type { AdminRecord, AdminRole } from '@/lib/admins'
 import type { AuditLog } from '@/types'
@@ -117,7 +117,7 @@ export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, user
 
   // ── Draft state ──
   const [isDraft, setIsDraft]             = useState(initialIsDraft)
-  const [draftSeatCount]                  = useState(initialDraftSeatCount)
+  const [draftSeatCount, setDraftSeatCount] = useState(initialDraftSeatCount)
   const [draftError, setDraftError]       = useState<string | null>(null)
   const [draftConfirm, setDraftConfirm]   = useState<'publish' | 'discard' | null>(null)
 
@@ -127,6 +127,7 @@ export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, user
       try {
         await initializeDraft(floorId)
         setIsDraft(true)
+        setDraftSeatCount(await getDraftSeatCount(floorId))
       } catch (err) {
         setDraftError(err instanceof Error ? err.message : 'Failed to start draft.')
       }
@@ -140,6 +141,7 @@ export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, user
         await publishDraft(floorId)
         setIsDraft(false)
         setDraftConfirm(null)
+        await Promise.all([refreshSnapshots(), refreshLogs()])
       } catch (err) {
         setDraftError(err instanceof Error ? err.message : 'Publish failed.')
         setDraftConfirm(null)
@@ -154,6 +156,7 @@ export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, user
         await discardDraft(floorId)
         setIsDraft(false)
         setDraftConfirm(null)
+        await refreshLogs()
       } catch (err) {
         setDraftError(err instanceof Error ? err.message : 'Discard failed.')
         setDraftConfirm(null)
@@ -218,8 +221,14 @@ export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, user
     })
   }
 
+  const [logs, setLogs] = useState<AuditLog[]>(initialLogs)
+
+  async function refreshLogs() {
+    setLogs(await listAuditLogs() as AuditLog[])
+  }
+
   const table = useReactTable({
-    data: initialLogs,
+    data: logs,
     columns,
     state: { sorting, globalFilter },
     onSortingChange: setSorting,
@@ -263,7 +272,7 @@ export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, user
       try {
         await restoreSnapshot(confirmId)
         setRestoreMsg('Restored successfully. Refresh the map to see changes.')
-        await refreshSnapshots()
+        await Promise.all([refreshSnapshots(), refreshLogs()])
       } catch (err) {
         setRestoreMsg(err instanceof Error ? err.message : 'Restore failed')
       } finally {

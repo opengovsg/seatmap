@@ -29,15 +29,13 @@ interface MapClientProps {
   floor:          Floor
   initialSeats:   Seat[]
   initialPeople:  Person[]
-  teams:          string[]
-  divisions:      string[]
   userEmail:      string
   isDraft:        boolean
   draftName:      string | null
   userIsAdmin:    boolean
 }
 
-export function MapClient({ floor, initialSeats, initialPeople, teams, divisions, userEmail, isDraft, draftName, userIsAdmin }: MapClientProps) {
+export function MapClient({ floor, initialSeats, initialPeople, userEmail, isDraft, draftName, userIsAdmin }: MapClientProps) {
   const [seats,           setSeats]           = useState<Seat[]>(initialSeats)
   const [people,          setPeople]          = useState<Person[]>(initialPeople)
   const [selectedSeat,    setSelectedSeat]    = useState<Seat | null>(null)
@@ -45,11 +43,25 @@ export function MapClient({ floor, initialSeats, initialPeople, teams, divisions
   const [moveError,       setMoveError]       = useState<string | null>(null)
   const [panelOpen,       setPanelOpen]       = useState(false)
   const [assigningPerson, setAssigningPerson] = useState<Person | null>(null)
+  const [modalPerson,     setModalPerson]     = useState<Person | null>(null)
   const [confirmDialog,   setConfirmDialog]   = useState<{
     title: string
     description: string
     onConfirm: () => void
   } | null>(null)
+
+  // ── Derived teams/divisions — stay in sync with live seats + people ─────────
+  const liveTeams = useMemo(() => {
+    const fromSeats   = seats.map(s => s.occupant_team).filter(Boolean) as string[]
+    const fromPeople  = people.map(p => p.team).filter(Boolean) as string[]
+    return [...new Set([...fromSeats, ...fromPeople])].sort()
+  }, [seats, people])
+
+  const liveDivisions = useMemo(() => {
+    const fromSeats   = seats.map(s => s.occupant_division).filter(Boolean) as string[]
+    const fromPeople  = people.map(p => p.division).filter(Boolean) as string[]
+    return [...new Set([...fromSeats, ...fromPeople])].sort()
+  }, [seats, people])
 
   // ── Filter state ────────────────────────────────────────────────────────────
   const [searchQuery,     setSearchQuery]     = useState('')
@@ -157,12 +169,14 @@ export function MapClient({ floor, initialSeats, initialPeople, teams, divisions
           title: `${seat.label} is occupied`,
           description: `${seat.occupant_name} is currently assigned here. Replace with ${assigningPerson.name}?`,
           onConfirm: () => {
+            setModalPerson(assigningPerson)
             setSelectedSeat(seat)
             setAssigningPerson(null)
           },
         })
         return
       }
+      setModalPerson(assigningPerson)
       setSelectedSeat(seat)
       setAssigningPerson(null)
       return
@@ -219,8 +233,8 @@ export function MapClient({ floor, initialSeats, initialPeople, teams, divisions
       <NavBar
         seats={seats}
         userEmail={userEmail}
-        teams={teams}
-        divisions={divisions}
+        teams={liveTeams}
+        divisions={liveDivisions}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         statusFilter={statusFilter}
@@ -284,8 +298,8 @@ export function MapClient({ floor, initialSeats, initialPeople, teams, divisions
         onClose={() => setPanelOpen(false)}
         people={people}
         userIsAdmin={userIsAdmin}
-        teams={teams}
-        divisions={divisions}
+        teams={liveTeams}
+        divisions={liveDivisions}
         onPersonAssign={handlePersonAssign}
         onRefresh={handleRefreshPeople}
       />
@@ -293,13 +307,14 @@ export function MapClient({ floor, initialSeats, initialPeople, teams, divisions
       <SeatModal
         key={selectedSeat?.id}
         seat={selectedSeat}
-        teams={teams}
-        divisions={divisions}
+        teams={liveTeams}
+        divisions={liveDivisions}
         unseatedPeople={unseatedPeople}
-        initialPerson={assigningPerson}
+        initialPerson={modalPerson}
         onClose={() => {
           setSelectedSeat(null)
           setAssigningPerson(null)
+          setModalPerson(null)
         }}
         onUpdated={async () => {
           await refreshSeats()

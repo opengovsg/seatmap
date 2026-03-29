@@ -34,16 +34,10 @@ export default async function MapPage() {
   }
 
   // Load seats from the draft table or the live table depending on mode
-  const [{ data: seats }, { data: teamRows }, { data: divisionRows }, { data: svgRectRows }] = await Promise.all([
+  const [{ data: seats }, { data: svgRectRows }] = await Promise.all([
     isDraft
       ? db.from('seat_drafts').select('seat_id, floor_id, label, status, occupant_name, occupant_team, occupant_division, notes').eq('floor_id', floor.id).order('label')
       : db.from('seats').select('*').order('label'),
-    isDraft
-      ? db.from('seat_drafts').select('occupant_team').not('occupant_team', 'is', null)
-      : db.from('seats').select('occupant_team').not('occupant_team', 'is', null),
-    isDraft
-      ? db.from('seat_drafts').select('occupant_division').not('occupant_division', 'is', null)
-      : db.from('seats').select('occupant_division').not('occupant_division', 'is', null),
     // In draft mode, fetch svg_rect_id from live seats table (it never changes)
     isDraft
       ? db.from('seats').select('id, svg_rect_id').eq('floor_id', floor.id)
@@ -71,9 +65,6 @@ export default async function MapPage() {
       })
     : (seats ?? [])
 
-  const teams     = [...new Set((teamRows     ?? []).map((r) => r.occupant_team     as string))].sort()
-  const divisions = [...new Set((divisionRows ?? []).map((r) => r.occupant_division as string))].sort()
-
   const people = await listPeople(isDraft)
 
   return (
@@ -82,8 +73,6 @@ export default async function MapPage() {
         floor={floor}
         initialSeats={normalizedSeats as Seat[]}
         initialPeople={people}
-        teams={teams}
-        divisions={divisions}
         userEmail={user.email ?? ''}
         isDraft={isDraft}
         draftName={draftName}

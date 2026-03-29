@@ -113,6 +113,13 @@ export async function unarchivePerson(personId: string): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
+export async function deletePerson(personId: string): Promise<void> {
+  await requireAuth()
+  const db = createAdminClient()
+  const { error } = await db.from('people').delete().eq('id', personId)
+  if (error) throw new Error(error.message)
+}
+
 export async function unassignSeatByPersonId(personId: string): Promise<void> {
   await requireAuth()
   const { unassignSeat } = await import('@/app/actions/seats')

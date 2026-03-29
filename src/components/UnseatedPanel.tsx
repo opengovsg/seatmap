@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { X, Search, UserRound, UserRoundCheck, UserRoundX, UserRoundPlus, MoreHorizontal, Move, SquarePen } from 'lucide-react'
+import { X, Search, UserRound, UserRoundCheck, UserRoundX, UserRoundPlus, MoreHorizontal, Move } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -11,8 +11,9 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import type { Person } from '@/types'
-import { archivePerson, unarchivePerson, unassignSeatByPersonId } from '@/app/actions/people'
+import { archivePerson, unarchivePerson, unassignSeatByPersonId, deletePerson } from '@/app/actions/people'
 import { PersonModal } from './PersonModal'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 
 interface UnseatedPanelProps {
   open: boolean
@@ -32,6 +33,7 @@ export function UnseatedPanel({ open, onClose, people, userIsAdmin, teams, divis
   const [filter, setFilter]               = useState<FilterTab>('unseated')
   const [showAdd, setShowAdd]             = useState(false)
   const [editingPerson, setEditingPerson] = useState<Person | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<Person | null>(null)
   const [isPending, startTransition]      = useTransition()
 
   const unseated = people.filter(p => !p.is_archived && !p.seat)
@@ -59,6 +61,12 @@ export function UnseatedPanel({ open, onClose, people, userIsAdmin, teams, divis
   function handleUnassign(person: Person) {
     startTransition(async () => {
       try { await unassignSeatByPersonId(person.id); await onRefresh() } catch { /* ignore */ }
+    })
+  }
+
+  function handleDelete(person: Person) {
+    startTransition(async () => {
+      try { await deletePerson(person.id); setConfirmDelete(null); await onRefresh() } catch { /* ignore */ }
     })
   }
 
@@ -132,10 +140,11 @@ export function UnseatedPanel({ open, onClose, people, userIsAdmin, teams, divis
                   person={person}
                   userIsAdmin={userIsAdmin}
                   onEdit={() => setEditingPerson(person)}
-                  onAssign={filter === 'unseated' ? () => { onClose(); onPersonAssign(person) } : undefined}
+                  onAssign={filter !== 'archived' ? () => { onClose(); onPersonAssign(person) } : undefined}
                   onUnassign={filter === 'seated' ? () => handleUnassign(person) : undefined}
                   onArchive={filter !== 'archived' ? () => handleArchive(person) : undefined}
                   onUnarchive={filter === 'archived' ? () => handleUnarchive(person) : undefined}
+                  onDelete={filter === 'archived' && userIsAdmin ? () => setConfirmDelete(person) : undefined}
                   isPending={isPending}
                 />
               ))}
@@ -163,11 +172,29 @@ export function UnseatedPanel({ open, onClose, people, userIsAdmin, teams, divis
         teams={teams}
         divisions={divisions}
       />
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!confirmDelete} onOpenChange={(open) => { if (!open) setConfirmDelete(null) }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete person?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">{confirmDelete?.name}</span> will be permanently deleted. This cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button variant="destructive" disabled={isPending} onClick={() => confirmDelete && handleDelete(confirmDelete)}>
+              {isPending ? 'Deleting…' : 'Delete'}
+            </Button>
+            <Button variant="ghost" onClick={() => setConfirmDelete(null)}>Cancel</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
 
-function PersonRow({ person, userIsAdmin, onEdit, onAssign, onUnassign, onArchive, onUnarchive, isPending }: {
+function PersonRow({ person, userIsAdmin, onEdit, onAssign, onUnassign, onArchive, onUnarchive, onDelete, isPending }: {
   person: Person
   userIsAdmin: boolean
   onEdit: () => void
@@ -175,6 +202,7 @@ function PersonRow({ person, userIsAdmin, onEdit, onAssign, onUnassign, onArchiv
   onUnassign?: () => void
   onArchive?: () => void
   onUnarchive?: () => void
+  onDelete?: () => void
   isPending: boolean
 }) {
   return (
@@ -203,18 +231,11 @@ function PersonRow({ person, userIsAdmin, onEdit, onAssign, onUnassign, onArchiv
 
       {/* Action buttons — visible on hover */}
       <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 mt-0.5">
-        {/* Edit (unseated) or Move (seated) button */}
         {onAssign && (
-          <Button size="icon-sm" variant="ghost" onClick={onEdit} title="Edit person">
-            <SquarePen className="size-3.5" />
-          </Button>
-        )}
-        {onUnassign && (
-          <Button size="icon-sm" variant="ghost" onClick={onUnassign} title="Move to another seat" disabled={isPending}>
+          <Button size="icon-sm" variant="ghost" onClick={onAssign} title="Pick a seat" className="text-muted-foreground/50 hover:text-muted-foreground">
             <Move className="size-3.5" />
           </Button>
         )}
-
         {/* Three-dot menu */}
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button size="icon-sm" variant="ghost" title="More options" />}>
@@ -246,6 +267,18 @@ function PersonRow({ person, userIsAdmin, onEdit, onAssign, onUnassign, onArchiv
                     Archive
                   </DropdownMenuItem>
                 ) : null}
+              </>
+            )}
+            {onDelete && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={onDelete}
+                  disabled={isPending}
+                  className="text-destructive focus:text-destructive"
+                >
+                  Delete
+                </DropdownMenuItem>
               </>
             )}
           </DropdownMenuContent>

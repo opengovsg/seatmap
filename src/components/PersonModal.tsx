@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import {
   Combobox, ComboboxInput, ComboboxContent, ComboboxList, ComboboxItem, ComboboxEmpty,
 } from '@/components/ui/combobox'
@@ -49,18 +49,25 @@ interface PersonModalProps {
   /** Provide to edit an existing person; omit to create a new one */
   person?: Person
   onSaved: (person: Person) => void
+  /** Pre-fill the name field when creating a new person */
+  initialName?: string
   teams: string[]
   divisions: string[]
 }
 
-export function PersonModal({ open, onClose, person, onSaved, teams, divisions }: PersonModalProps) {
+export function PersonModal({ open, onClose, person, onSaved, initialName, teams, divisions }: PersonModalProps) {
   const isEdit = !!person
 
-  const [name,     setName]     = useState(person?.name     ?? '')
+  const [name,     setName]     = useState(person?.name     ?? initialName ?? '')
   const [team,     setTeam]     = useState(person?.team     ?? '')
   const [division, setDivision] = useState(person?.division ?? '')
   const [error,    setError]    = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  // Sync prefilled name each time the modal opens (useState ignores prop changes after mount)
+  useEffect(() => {
+    if (open && !isEdit) setName(initialName ?? '')
+  }, [open])
 
   function handleClose() {
     setName(''); setTeam(''); setDivision(''); setError(null)
@@ -93,47 +100,49 @@ export function PersonModal({ open, onClose, person, onSaved, teams, divisions }
 
   return (
     <Dialog open={open} onOpenChange={(open) => { if (!open) handleClose() }}>
-      <DialogContent className="sm:max-w-xs">
+      <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit person' : 'Add person'}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="grid gap-3 pt-1">
-          <div className="grid gap-1.5">
-            <Label htmlFor="pm-name">Name *</Label>
-            <Input
-              id="pm-name"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="Full name"
-              autoFocus
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="pm-team">Team</Label>
-            <TeamCombobox
-              id="pm-team"
-              value={team}
-              onChange={setTeam}
-              options={teams}
-              placeholder="Team name"
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="pm-division">Division</Label>
-            <TeamCombobox
-              id="pm-division"
-              value={division}
-              onChange={setDivision}
-              options={divisions}
-              placeholder="Division name"
-            />
-          </div>
-          {error && <p className="text-xs text-destructive">{error}</p>}
+        <form onSubmit={handleSubmit} className="pt-1">
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="pm-name">Name</FieldLabel>
+              <Input
+                id="pm-name"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="Full name"
+                autoFocus
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="pm-team">Team</FieldLabel>
+              <TeamCombobox
+                id="pm-team"
+                value={team}
+                onChange={setTeam}
+                options={teams}
+                placeholder="Team name"
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="pm-division">Division</FieldLabel>
+              <TeamCombobox
+                id="pm-division"
+                value={division}
+                onChange={setDivision}
+                options={divisions}
+                placeholder="Division name"
+              />
+            </Field>
+          </FieldGroup>
+          {error && <p className="text-xs text-destructive mt-1">{error}</p>}
           <DialogFooter>
-            <Button type="submit" disabled={isPending || !name.trim()}>
+            <Button type="submit" className="flex-1" disabled={isPending || !name.trim()}>
               {isPending ? 'Saving…' : isEdit ? 'Save' : 'Add'}
             </Button>
-            <Button type="button" variant="ghost" onClick={handleClose}>
+            <Button type="button" variant="ghost" className="flex-1" onClick={handleClose}>
               Cancel
             </Button>
           </DialogFooter>

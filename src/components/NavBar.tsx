@@ -15,7 +15,9 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Search, X, MoreHorizontal } from 'lucide-react'
+import { Search, X, MoreHorizontal, ContactRound } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 
 const STAT_COLOURS: Record<SeatStatus, string> = {
   OCCUPIED:  '#848f99',
@@ -36,6 +38,8 @@ interface NavBarProps {
   onTeamFilterChange:     (team: string | null) => void
   divisionFilter:         string | null
   onDivisionFilterChange: (division: string | null) => void
+  onPeopleClick:          () => void
+  unseatedCount:          number
 }
 
 export function NavBar({
@@ -44,6 +48,7 @@ export function NavBar({
   statusFilter, onStatusChange,
   teamFilter, onTeamFilterChange,
   divisionFilter, onDivisionFilterChange,
+  onPeopleClick, unseatedCount,
 }: NavBarProps) {
   const router = useRouter()
 
@@ -61,11 +66,20 @@ export function NavBar({
   return (
     <header className="border-b bg-background px-5 py-3 flex items-center gap-3 shrink-0 flex-wrap min-h-[56px]">
 
-      {/* Logo */}
-      <span className="font-semibold text-sm mr-1">seatmap</span>
+      {/* People button */}
+      <Button
+        variant="outline"
+        size="lg"
+        className="gap-2 shrink-0 h-9 text-sm font-normal"
+        onClick={onPeopleClick}
+      >
+        <ContactRound className="size-4" />
+        People
+        {unseatedCount > 0 && <Badge variant="secondary">{unseatedCount}</Badge>}
+      </Button>
 
       {/* Search */}
-      <div className="relative w-[300px]">
+      <div className="relative w-[220px]">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
         <Input
           value={searchQuery}
@@ -157,8 +171,8 @@ export function NavBar({
 
       {/* User menu */}
       <DropdownMenu>
-        <DropdownMenuTrigger className="flex items-center justify-center size-8 rounded-md hover:bg-muted transition-colors outline-none">
-          <MoreHorizontal className="size-4 text-muted-foreground" />
+        <DropdownMenuTrigger render={<Button variant="ghost" size="icon" />}>
+          <MoreHorizontal className="size-4" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
           <div className="px-2 py-1.5 text-xs text-muted-foreground truncate">{userEmail}</div>

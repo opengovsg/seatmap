@@ -1,3 +1,38 @@
+## 2026-03-29 — People Panel & Navbar Polish
+
+**Changes:**
+- Fixed `TabsRootContext` runtime error — `TabsList`/`TabsTrigger` require a `<Tabs>` root wrapper; added it to `UnseatedPanel`
+- Filter tabs now only show unseated count; seated/archived counts hidden
+- Removed divider between search row and filter tabs
+- `+` add button moved to right of search, sized to match input height, uses `UserRoundPlus` icon
+- Person row icons: `UserRound` (unseated), `UserRoundCheck` (seated), `UserRoundX` (archived)
+- Archived people: removed strikethrough; icon change alone signals archived state
+- Unseated row: clicking the row triggers assign flow; hover button changed to edit (`SquarePen`)
+- Seated row: move button changed to `Move` icon (four-arrow)
+- Alignment fix: all panel sections normalized to `px-3`; close button upgraded to `size="icon"`
+- People toggle button moved from floating overlay on map → into navbar as first item
+- Navbar: People button is an outline button with `ContactRound` icon, inline label, and unseated count badge
+- Navbar: logo and dot menu simplified to a single large `size="icon"` ghost dot menu (logo removed)
+- `unseatedPeople` memo now excludes archived people (was over-counting)
+- Search box width reduced from 300px to 220px
+- People button uses `h-9` height to match dropdowns
+
+**Decisions:**
+- People button moved to navbar — cleaner than floating absolute button on the map canvas; consistent with other nav controls
+- Logo removed from navbar — minimalist approach; the app's identity is implicit
+- Archived icon swap instead of strikethrough — more readable, less visually noisy
+- Unseated row click = assign flow — the primary action for an unseated person is to place them, so the whole row is the trigger
+
+**Current state:**
+TypeScript clean. People panel fully polished with correct icons, aligned layout, and tab-based filtering. Navbar has People button with live unseated count. All changes on `people` branch.
+
+**Next steps:**
+- Test full flow end-to-end: add → assign → edit → unassign → archive → unarchive
+- Consider: should the "Move" button in the seated row close the panel and enter move mode on the map?
+- Consider: merge `people` branch into `drafts` or `main`
+
+---
+
 ## 2026-03-29 — People Panel Polish + Bug Fixes
 
 **Changes:**

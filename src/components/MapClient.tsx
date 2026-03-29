@@ -210,7 +210,7 @@ export function MapClient({ floor, initialSeats, initialPeople, teams, divisions
   }, [refreshPeople])
 
   const unseatedPeople = useMemo(
-    () => people.filter(p => !p.seat),
+    () => people.filter(p => !p.seat && !p.is_archived),
     [people]
   )
 
@@ -229,6 +229,8 @@ export function MapClient({ floor, initialSeats, initialPeople, teams, divisions
         onTeamFilterChange={setTeamFilter}
         divisionFilter={divisionFilter}
         onDivisionFilterChange={setDivisionFilter}
+        onPeopleClick={() => setPanelOpen(v => !v)}
+        unseatedCount={unseatedPeople.length}
       />
 
       {isDraft && (
@@ -268,17 +270,6 @@ export function MapClient({ floor, initialSeats, initialPeople, teams, divisions
       )}
 
       <main className="relative flex-1 overflow-auto bg-muted/30">
-        {/* People panel toggle button */}
-        <Button
-          variant="outline"
-          className="absolute top-3 left-3 z-20 shadow-sm gap-2 rounded-full"
-          onClick={() => setPanelOpen(v => !v)}
-        >
-          <ContactRound className="size-4" />
-          People
-          {unseatedPeople.length > 0 && <Badge variant="secondary">{unseatedPeople.length}</Badge>}
-        </Button>
-
         <SeatMap
           svgContent={floor.svg_content}
           seats={seats}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { X, Plus, Search, CircleUserRound, MoreHorizontal, Move, SquarePen } from 'lucide-react'
+import { X, Search, UserRound, UserRoundCheck, UserRoundX, UserRoundPlus, MoreHorizontal, Move, SquarePen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -77,15 +77,15 @@ export function UnseatedPanel({ open, onClose, people, userIsAdmin, teams, divis
       ].join(' ')}>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b shrink-0">
+        <div className="flex items-center justify-between px-3 py-3 border-b shrink-0">
           <span className="font-semibold text-sm">People</span>
-          <Button size="icon-sm" variant="ghost" onClick={onClose}>
+          <Button size="icon" variant="ghost" onClick={onClose}>
             <X className="size-4" />
           </Button>
         </div>
 
         {/* Search + Add */}
-        <div className="px-4 py-2 shrink-0 flex items-center gap-2">
+        <div className="px-3 py-2 shrink-0 flex items-center gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
             <Input
@@ -96,14 +96,14 @@ export function UnseatedPanel({ open, onClose, people, userIsAdmin, teams, divis
             />
           </div>
           <Button size="icon" variant="outline" onClick={() => setShowAdd(true)} title="Add person">
-            <Plus className="size-4" />
+            <UserRoundPlus className="size-4" />
           </Button>
         </div>
 
         {/* Filter tabs */}
         <div className="shrink-0">
           <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterTab)}>
-            <TabsList variant="line" className="w-full px-2">
+            <TabsList variant="line" className="w-full px-3">
               {(['unseated', 'seated', 'archived'] as FilterTab[]).map(tab => (
                 <TabsTrigger
                   key={tab}
@@ -121,7 +121,7 @@ export function UnseatedPanel({ open, onClose, people, userIsAdmin, teams, divis
         </div>
 
         {/* List */}
-        <div className="flex-1 overflow-y-auto px-4 py-3">
+        <div className="flex-1 overflow-y-auto px-3 py-3">
           {filtered.length === 0 ? (
             <p className="text-xs text-muted-foreground">No {filter} people.</p>
           ) : (
@@ -179,11 +179,16 @@ function PersonRow({ person, userIsAdmin, onEdit, onAssign, onUnassign, onArchiv
 }) {
   return (
     <li className="flex items-start gap-2 rounded-md px-2 py-1.5 hover:bg-muted/60 transition-colors group">
-      <CircleUserRound className="size-4 text-muted-foreground shrink-0 mt-0.5" />
+      {person.is_archived
+        ? <UserRoundX     className="size-4 text-muted-foreground shrink-0 mt-0.5" />
+        : person.seat
+        ? <UserRoundCheck className="size-4 text-muted-foreground shrink-0 mt-0.5" />
+        : <UserRound      className="size-4 text-muted-foreground shrink-0 mt-0.5" />
+      }
 
       {/* Name / meta — clickable to assign (unseated) or edit (others) */}
       <div className="flex-1 min-w-0 cursor-pointer" onClick={onAssign ?? onEdit}>
-        <p className={`text-sm font-medium truncate ${person.is_archived ? 'text-muted-foreground line-through' : ''}`}>
+        <p className={`text-sm font-medium truncate ${person.is_archived ? 'text-muted-foreground' : ''}`}>
           {person.name}
         </p>
         {(person.team || person.division) && (

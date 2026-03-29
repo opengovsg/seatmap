@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
 const STAT_COLOURS: Record<SeatStatus, string> = {
-  OCCUPIED:  '#848f99',
+  OCCUPIED:  '#5a6472',
   AVAILABLE: '#22c55e',
   RESERVED:  '#f59e0b',
 }

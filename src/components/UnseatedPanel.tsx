@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { X, Plus, Search, UserRound, MoreHorizontal, ArrowRightLeft } from 'lucide-react'
+import { X, Plus, Search, CircleUserRound, MoreHorizontal, Move, SquarePen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -78,19 +79,14 @@ export function UnseatedPanel({ open, onClose, people, userIsAdmin, teams, divis
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b shrink-0">
           <span className="font-semibold text-sm">People</span>
-          <div className="flex items-center gap-1">
-            <Button size="icon-sm" variant="ghost" onClick={() => setShowAdd(true)} title="Add person">
-              <Plus className="size-4" />
-            </Button>
-            <Button size="icon-sm" variant="ghost" onClick={onClose}>
-              <X className="size-4" />
-            </Button>
-          </div>
+          <Button size="icon-sm" variant="ghost" onClick={onClose}>
+            <X className="size-4" />
+          </Button>
         </div>
 
-        {/* Search */}
-        <div className="px-4 py-2 border-b shrink-0">
-          <div className="relative">
+        {/* Search + Add */}
+        <div className="px-4 py-2 shrink-0 flex items-center gap-2">
+          <div className="relative flex-1">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
             <Input
               value={search}
@@ -99,20 +95,29 @@ export function UnseatedPanel({ open, onClose, people, userIsAdmin, teams, divis
               className="pl-8 h-8 text-sm"
             />
           </div>
+          <Button size="icon" variant="outline" onClick={() => setShowAdd(true)} title="Add person">
+            <Plus className="size-4" />
+          </Button>
         </div>
 
-        {/* Filter badges */}
-        <div className="px-4 py-2 border-b shrink-0 flex gap-1.5">
-          {(['unseated', 'seated', 'archived'] as FilterTab[]).map(tab => (
-            <Badge
-              key={tab}
-              variant={filter === tab ? 'default' : 'outline'}
-              className="cursor-pointer capitalize"
-              render={<button onClick={() => setFilter(tab)} />}
-            >
-              {tab} {counts[tab] > 0 && `(${counts[tab]})`}
-            </Badge>
-          ))}
+        {/* Filter tabs */}
+        <div className="shrink-0">
+          <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterTab)}>
+            <TabsList variant="line" className="w-full px-2">
+              {(['unseated', 'seated', 'archived'] as FilterTab[]).map(tab => (
+                <TabsTrigger
+                  key={tab}
+                  value={tab}
+                  className="flex-1 capitalize text-xs gap-1"
+                >
+                  {tab}
+                  {tab === 'unseated' && counts[tab] > 0 && (
+                    <span className="text-muted-foreground">{counts[tab]}</span>
+                  )}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
         </div>
 
         {/* List */}
@@ -173,11 +178,11 @@ function PersonRow({ person, userIsAdmin, onEdit, onAssign, onUnassign, onArchiv
   isPending: boolean
 }) {
   return (
-    <li className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/60 transition-colors group">
-      <UserRound className="size-4 text-muted-foreground shrink-0" />
+    <li className="flex items-start gap-2 rounded-md px-2 py-1.5 hover:bg-muted/60 transition-colors group">
+      <CircleUserRound className="size-4 text-muted-foreground shrink-0 mt-0.5" />
 
-      {/* Name / meta — clickable to edit */}
-      <div className="flex-1 min-w-0 cursor-pointer" onClick={onEdit}>
+      {/* Name / meta — clickable to assign (unseated) or edit (others) */}
+      <div className="flex-1 min-w-0 cursor-pointer" onClick={onAssign ?? onEdit}>
         <p className={`text-sm font-medium truncate ${person.is_archived ? 'text-muted-foreground line-through' : ''}`}>
           {person.name}
         </p>
@@ -192,25 +197,22 @@ function PersonRow({ person, userIsAdmin, onEdit, onAssign, onUnassign, onArchiv
       </div>
 
       {/* Action buttons — visible on hover */}
-      <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100">
-        {/* Assign (unseated) or Move (seated) button */}
+      <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 mt-0.5">
+        {/* Edit (unseated) or Move (seated) button */}
         {onAssign && (
-          <Button size="icon-sm" variant="ghost" onClick={onAssign} title="Assign to seat">
-            <Plus className="size-3.5" />
+          <Button size="icon-sm" variant="ghost" onClick={onEdit} title="Edit person">
+            <SquarePen className="size-3.5" />
           </Button>
         )}
         {onUnassign && (
           <Button size="icon-sm" variant="ghost" onClick={onUnassign} title="Move to another seat" disabled={isPending}>
-            <ArrowRightLeft className="size-3.5" />
+            <Move className="size-3.5" />
           </Button>
         )}
 
         {/* Three-dot menu */}
         <DropdownMenu>
-          <DropdownMenuTrigger
-            className="flex items-center justify-center size-6 rounded-md hover:bg-accent transition-colors outline-none"
-            title="More options"
-          >
+          <DropdownMenuTrigger render={<Button size="icon-sm" variant="ghost" title="More options" />}>
             <MoreHorizontal className="size-3.5" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-36">

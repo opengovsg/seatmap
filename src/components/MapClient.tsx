@@ -10,8 +10,9 @@ import { moveSeat, restoreSeat } from '@/app/actions/seats'
 import { listPeople } from '@/app/actions/people'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { FileEdit, Users } from 'lucide-react'
+import { FileEdit, ContactRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog'
@@ -269,13 +270,13 @@ export function MapClient({ floor, initialSeats, initialPeople, teams, divisions
       <main className="relative flex-1 overflow-auto bg-muted/30">
         {/* People panel toggle button */}
         <Button
-          size="icon-sm"
-          variant="secondary"
-          className="absolute top-3 left-3 z-20 shadow-sm"
+          variant="outline"
+          className="absolute top-3 left-3 z-20 shadow-sm gap-2 rounded-full"
           onClick={() => setPanelOpen(v => !v)}
-          title="People"
         >
-          <Users className="size-4" />
+          <ContactRound className="size-4" />
+          People
+          {unseatedPeople.length > 0 && <Badge variant="secondary">{unseatedPeople.length}</Badge>}
         </Button>
 
         <SeatMap

@@ -357,11 +357,7 @@ export function SeatModal({ seat, teams, divisions, unseatedPeople, initialPerso
             <>
               <div className="grid gap-3">
                 <div className="grid gap-1.5">
-                  <Label htmlFor="edit-label">Seat label</Label>
-                  <Input id="edit-label" value={editLabel} onChange={e => setEditLabel(e.target.value)} />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="edit-name">Name *</Label>
+                  <Label htmlFor="edit-name">Name</Label>
                   <Input id="edit-name" value={editName} onChange={e => setEditName(e.target.value)} autoFocus />
                 </div>
                 <div className="grid gap-1.5">
@@ -387,15 +383,13 @@ export function SeatModal({ seat, teams, divisions, unseatedPeople, initialPerso
                         team: editTeam.trim() || null,
                         division: editDivision.trim() || null,
                       })
-                      // Update label and notes on the seat directly
+                      // Update notes on the seat directly
                       await updateSeat(seat.id, {
-                        label: editLabel.trim() || undefined,
                         notes: editNotes.trim() || null,
                       })
                     } else {
                       // Legacy free-text seat — update everything on the seat
                       await updateSeat(seat.id, {
-                        label: editLabel.trim() || undefined,
                         occupant_name: editName.trim(),
                         occupant_team: editTeam.trim() || null,
                         occupant_division: editDivision.trim() || null,

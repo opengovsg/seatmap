@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition, useMemo } from 'react'
 import {
-  useReactTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel,
+  useReactTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel,
   flexRender, type ColumnDef, type SortingState,
 } from '@tanstack/react-table'
 import { uploadFloor, restoreSnapshot, listSnapshots, listAuditLogs } from '@/app/actions/floor'
@@ -102,14 +102,16 @@ function makeColumns(onUndo: (log: AuditLog) => void): ColumnDef<AuditLog>[] {
         const log = row.original
         if (!UNDOABLE_ACTIONS.has(log.action) || !log.before) return null
         return (
-          <button
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          <Button
+            variant="link"
+            size="sm"
+            className="h-auto p-0 text-xs"
             onClick={() => onUndo(log)}
             title="Undo this change"
           >
             <Undo2 className="size-3" />
             Undo
-          </button>
+          </Button>
         )
       },
     },
@@ -139,6 +141,7 @@ export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, user
   const [isPending, startTransition]      = useTransition()
   const [globalFilter, setGlobalFilter]   = useState('')
   const [sorting, setSorting]             = useState<SortingState>([{ id: 'created_at', desc: true }])
+  const [snapPage, setSnapPage]           = useState(0)
 
   // ── Draft state ──
   const [isDraft, setIsDraft]             = useState(initialIsDraft)
@@ -295,6 +298,8 @@ export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, user
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    initialState: { pagination: { pageSize: 15 } },
   })
 
   async function refreshSnapshots() {
@@ -421,7 +426,7 @@ export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, user
           <Input
             placeholder="Filter by editor, seat, or action…"
             value={globalFilter}
-            onChange={e => setGlobalFilter(e.target.value)}
+            onChange={e => { setGlobalFilter(e.target.value); table.setPageIndex(0) }}
             className="max-w-sm"
           />
           <div className="rounded-md border overflow-x-auto">
@@ -458,9 +463,19 @@ export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, user
               </TableBody>
             </Table>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Showing {table.getRowModel().rows.length} of {initialLogs.length} entries
-          </p>
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>
+              Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()} · {table.getFilteredRowModel().rows.length} entries
+            </span>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
+                Previous
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
+                Next
+              </Button>
+            </div>
+          </div>
           {undoError && (
             <div className="flex items-center gap-2 text-sm text-destructive">
               <AlertTriangle className="size-4 shrink-0" />
@@ -525,7 +540,7 @@ export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, user
             <p className="text-sm text-muted-foreground">No snapshots yet.</p>
           ) : (
             <div className="flex flex-col divide-y">
-              {snapshots.map(snap => (
+              {snapshots.slice(snapPage * 15, snapPage * 15 + 15).map(snap => (
                 <div key={snap.id} className="flex items-center justify-between py-3 gap-4">
                   <div className="flex flex-col gap-0.5">
                     <span className="text-sm font-medium">
@@ -554,6 +569,21 @@ export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, user
                   )}
                 </div>
               ))}
+            </div>
+          )}
+          {snapshots.length > 15 && (
+            <div className="flex items-center justify-between text-xs text-muted-foreground mt-3">
+              <span>
+                Page {snapPage + 1} of {Math.ceil(snapshots.length / 15)}
+              </span>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => setSnapPage(p => p - 1)} disabled={snapPage === 0}>
+                  Previous
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setSnapPage(p => p + 1)} disabled={snapPage >= Math.ceil(snapshots.length / 15) - 1}>
+                  Next
+                </Button>
+              </div>
             </div>
           )}
           {restoreMsg && (

@@ -2,6 +2,71 @@
 
 An office seat management tool. View the floor plan, assign people to seats, reserve seats, and track changes via an audit log.
 
+## Features
+
+- Interactive SVG floor plan with colour-coded seats (available, occupied, reserved)
+- Assign, move, and unassign people from seats
+- Full audit log of every change, with one-click undo
+- Draft mode — rearrange seats privately before publishing to the live map
+- Floor plan snapshots and rollback
+- People panel showing the full roster and who is unseated
+- Admin panel for managing users, audit logs, and floor plan versions
+
+## Tech stack
+
+- [Next.js](https://nextjs.org) (App Router, Server Actions)
+- [React 19](https://react.dev)
+- [Supabase](https://supabase.com) — PostgreSQL database and magic link authentication
+- [Tailwind CSS 4](https://tailwindcss.com)
+- [shadcn/ui](https://ui.shadcn.com) component library
+
+## Environment setup
+
+Create a `.env.local` file in the project root with the following variables. You'll find all of them in your Supabase project under **Settings → API**.
+
+```
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+```
+
+## Database setup
+
+Run the following SQL files in order in the Supabase SQL editor:
+
+1. `supabase/schema.sql` — core tables and policies
+2. `supabase/add-floor-snapshots.sql` — floor plan versioning
+3. `supabase/add-admins.sql` — admin user management
+4. `supabase/add-audit-before-snapshot.sql`
+5. `supabase/add-audit-improvements.sql`
+6. `supabase/add-draft.sql` — draft mode
+7. `supabase/add-draft-name.sql`
+8. `supabase/add-draft-started-at.sql`
+9. `supabase/update-publish-clears-draft-name.sql`
+10. `supabase/add-people.sql` — people/roster management
+
+Then seed the database with your floor plan:
+
+```bash
+npm run seed
+```
+
+## Authentication
+
+Login uses Supabase magic links (passwordless). Users enter their email, receive a link, and are authenticated on click — no password required.
+
+By default, only `@open.gov.sg` email addresses are allowed. To change the allowed domain, update the `isAllowedEmail` function in `src/app/login/page.tsx`.
+
+## Admin access
+
+The first admin must be added directly in the Supabase database. Run this in the SQL editor, substituting your email:
+
+```sql
+INSERT INTO admins (email, role) VALUES ('you@open.gov.sg', 'owner');
+```
+
+After that, you can add and remove other admins from the Admin panel at `/admin`.
+
 ## Getting started
 
 ```bash
@@ -14,14 +79,6 @@ Open [http://localhost:3000](http://localhost:3000). You'll be redirected to the
 ## Updating the floor plan
 
 When you get a new SVG from the designer, use the safe update script rather than re-seeding. It preserves all existing seat assignments and only changes what's different.
-
-### One-time setup
-
-Run this SQL in the Supabase SQL editor (only needed once):
-
-```
-supabase/add-floor-snapshots.sql
-```
 
 ### How to update
 

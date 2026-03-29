@@ -306,15 +306,18 @@ export async function moveSeat(fromSeatId: string, toSeatId: string) {
   const { data: toSeat }   = await db.from(table).select('*').eq(idCol, toSeatId).single()
   if (!fromSeat || !toSeat) throw new Error('Seat not found')
 
-  const isSwap = toSeat.status === 'OCCUPIED'
+  const isSwap     = toSeat.status === 'OCCUPIED'
+  const isReserved = toSeat.status === 'RESERVED'
 
   const extra = drafting ? { updated_by: email, updated_at: new Date().toISOString() } : {}
 
   if (isSwap) {
+    // Swap occupants between two occupied seats
     await db.from(table).update({
       occupant_name: toSeat.occupant_name,
       occupant_team: toSeat.occupant_team,
       occupant_division: toSeat.occupant_division,
+      person_id: toSeat.person_id ?? null,
       status: 'OCCUPIED',
       ...extra,
     }).eq(idCol, fromSeatId)
@@ -323,6 +326,7 @@ export async function moveSeat(fromSeatId: string, toSeatId: string) {
       occupant_name: fromSeat.occupant_name,
       occupant_team: fromSeat.occupant_team,
       occupant_division: fromSeat.occupant_division,
+      person_id: fromSeat.person_id ?? null,
       status: 'OCCUPIED',
       ...extra,
     }).eq(idCol, toSeatId)
@@ -337,12 +341,15 @@ export async function moveSeat(fromSeatId: string, toSeatId: string) {
       oldValue: toSeat.label,
       newValue: `${fromSeat.label} (swapped with ${fromSeat.occupant_name})`,
     })
-  } else {
+  } else if (isReserved) {
+    // Move person into reserved seat — reservation transfers to the vacated seat
     await db.from(table).update({
-      status: 'AVAILABLE',
+      status: 'RESERVED',
+      notes: toSeat.notes ?? null,
       occupant_name: null,
       occupant_team: null,
       occupant_division: null,
+      person_id: null,
       ...extra,
     }).eq(idCol, fromSeatId)
 
@@ -351,6 +358,38 @@ export async function moveSeat(fromSeatId: string, toSeatId: string) {
       occupant_name: fromSeat.occupant_name,
       occupant_team: fromSeat.occupant_team,
       occupant_division: fromSeat.occupant_division,
+      person_id: fromSeat.person_id ?? null,
+      notes: null,
+      ...extra,
+    }).eq(idCol, toSeatId)
+
+    await writeAudit(fromSeatId, 'MOVE', email, {
+      field: 'seat',
+      oldValue: fromSeat.label,
+      newValue: `${toSeat.label} (reservation moved here)`,
+    })
+    await writeAudit(toSeatId, 'MOVE', email, {
+      field: 'seat',
+      oldValue: toSeat.label,
+      newValue: fromSeat.label,
+    })
+  } else {
+    // Move person to an available seat
+    await db.from(table).update({
+      status: 'AVAILABLE',
+      occupant_name: null,
+      occupant_team: null,
+      occupant_division: null,
+      person_id: null,
+      ...extra,
+    }).eq(idCol, fromSeatId)
+
+    await db.from(table).update({
+      status: 'OCCUPIED',
+      occupant_name: fromSeat.occupant_name,
+      occupant_team: fromSeat.occupant_team,
+      occupant_division: fromSeat.occupant_division,
+      person_id: fromSeat.person_id ?? null,
       ...extra,
     }).eq(idCol, toSeatId)
 
@@ -361,5 +400,5 @@ export async function moveSeat(fromSeatId: string, toSeatId: string) {
     })
   }
 
-  return { isSwap, swapPersonName: isSwap ? (toSeat.occupant_name as string) : null }
+  return { isSwap, isReserved, swapPersonName: isSwap ? (toSeat.occupant_name as string) : null }
 }

@@ -22,7 +22,6 @@ export async function listPeople(isDraft = false): Promise<Person[]> {
   const { data: people, error } = await db
     .from('people')
     .select('*')
-    .eq('is_archived', false)
     .order('name')
 
   if (error) throw new Error(error.message)
@@ -105,4 +104,24 @@ export async function archivePerson(personId: string): Promise<void> {
   const db = createAdminClient()
   const { error } = await db.from('people').update({ is_archived: true }).eq('id', personId)
   if (error) throw new Error(error.message)
+}
+
+export async function unarchivePerson(personId: string): Promise<void> {
+  await requireAuth()
+  const db = createAdminClient()
+  const { error } = await db.from('people').update({ is_archived: false }).eq('id', personId)
+  if (error) throw new Error(error.message)
+}
+
+export async function unassignSeatByPersonId(personId: string): Promise<void> {
+  await requireAuth()
+  const { unassignSeat } = await import('@/app/actions/seats')
+  const db = createAdminClient()
+
+  // Try live seats first, then drafts
+  const { data: seat } = await db.from('seats').select('id').eq('person_id', personId).single()
+  if (seat) { await unassignSeat(seat.id); return }
+
+  const { data: draft } = await db.from('seat_drafts').select('seat_id').eq('person_id', personId).single()
+  if (draft) { await unassignSeat(draft.seat_id); return }
 }

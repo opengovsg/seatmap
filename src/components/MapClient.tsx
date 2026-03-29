@@ -12,6 +12,9 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { FileEdit, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from '@/components/ui/dialog'
 
 function toastTimestamp() {
   return new Date().toLocaleString('en-US', {
@@ -41,6 +44,11 @@ export function MapClient({ floor, initialSeats, initialPeople, teams, divisions
   const [moveError,       setMoveError]       = useState<string | null>(null)
   const [panelOpen,       setPanelOpen]       = useState(false)
   const [assigningPerson, setAssigningPerson] = useState<Person | null>(null)
+  const [confirmDialog,   setConfirmDialog]   = useState<{
+    title: string
+    description: string
+    onConfirm: () => void
+  } | null>(null)
 
   // ── Filter state ────────────────────────────────────────────────────────────
   const [searchQuery,     setSearchQuery]     = useState('')
@@ -115,11 +123,44 @@ export function MapClient({ floor, initialSeats, initialPeople, teams, divisions
     }
   }, [isDraft, floor.id])
 
+  function proceedWithMove(seat: Seat) {
+    if (!movingFrom) return
+    const fromSnapshot = { status: movingFrom.status, occupant_name: movingFrom.occupant_name, occupant_team: movingFrom.occupant_team, occupant_division: movingFrom.occupant_division, notes: movingFrom.notes, label: movingFrom.label }
+    const toSnapshot   = { status: seat.status, occupant_name: seat.occupant_name, occupant_team: seat.occupant_team, occupant_division: seat.occupant_division, notes: seat.notes, label: seat.label }
+    const fromId = movingFrom.id
+    const toId   = seat.id
+    moveSeat(fromId, toId)
+      .then((result) => {
+        refreshSeats()
+        const message = result.isSwap ? 'Seats have been swapped.' : 'Seat has been moved.'
+        toast(message, {
+          description: toastTimestamp(),
+          action: {
+            label: 'Undo',
+            onClick: async () => {
+              await restoreSeat(fromId, fromSnapshot)
+              await restoreSeat(toId, toSnapshot)
+              await refreshSeats()
+            },
+          },
+        })
+      })
+      .catch((e) => setMoveError(e.message))
+      .finally(() => setMovingFrom(null))
+  }
+
   const handleSeatClick = useCallback((seat: Seat) => {
     if (assigningPerson) {
       if (seat.status === 'OCCUPIED') {
-        const ok = window.confirm(`${seat.label} is already occupied by ${seat.occupant_name}.\n\nReplace with ${assigningPerson.name}?`)
-        if (!ok) return
+        setConfirmDialog({
+          title: `${seat.label} is occupied`,
+          description: `${seat.occupant_name} is currently assigned here. Replace with ${assigningPerson.name}?`,
+          onConfirm: () => {
+            setSelectedSeat(seat)
+            setAssigningPerson(null)
+          },
+        })
+        return
       }
       setSelectedSeat(seat)
       setAssigningPerson(null)
@@ -130,35 +171,24 @@ export function MapClient({ floor, initialSeats, initialPeople, teams, divisions
       if (seat.id === movingFrom.id) { setMovingFrom(null); return }
 
       if (seat.status === 'OCCUPIED') {
-        const ok = window.confirm(
-          `${seat.label} is occupied by ${seat.occupant_name}.\n\nSwap ${movingFrom.occupant_name} with ${seat.occupant_name}?`
-        )
-        if (!ok) return
+        setConfirmDialog({
+          title: 'Swap seats?',
+          description: `${seat.label} is occupied by ${seat.occupant_name}. Swap ${movingFrom.occupant_name} with ${seat.occupant_name}?`,
+          onConfirm: () => proceedWithMove(seat),
+        })
+        return
       }
 
-      const fromSnapshot = { status: movingFrom.status, occupant_name: movingFrom.occupant_name, occupant_team: movingFrom.occupant_team, occupant_division: movingFrom.occupant_division, notes: movingFrom.notes, label: movingFrom.label }
-      const toSnapshot = { status: seat.status, occupant_name: seat.occupant_name, occupant_team: seat.occupant_team, occupant_division: seat.occupant_division, notes: seat.notes, label: seat.label }
-      const fromId = movingFrom.id
-      const toId = seat.id
-
-      moveSeat(fromId, toId)
-        .then((result) => {
-          refreshSeats()
-          const message = result.isSwap ? 'Seats have been swapped.' : 'Seat has been moved.'
-          toast(message, {
-            description: toastTimestamp(),
-            action: {
-              label: 'Undo',
-              onClick: async () => {
-                await restoreSeat(fromId, fromSnapshot)
-                await restoreSeat(toId, toSnapshot)
-                await refreshSeats()
-              },
-            },
-          })
+      if (seat.status === 'RESERVED') {
+        setConfirmDialog({
+          title: 'Move to reserved seat?',
+          description: `${seat.label} is reserved${seat.notes ? ` for: ${seat.notes}` : ''}. Move ${movingFrom.occupant_name} here? The reservation will transfer to ${movingFrom.label}.`,
+          onConfirm: () => proceedWithMove(seat),
         })
-        .catch((e) => setMoveError(e.message))
-        .finally(() => setMovingFrom(null))
+        return
+      }
+
+      proceedWithMove(seat)
       return
     }
 
@@ -262,6 +292,8 @@ export function MapClient({ floor, initialSeats, initialPeople, teams, divisions
         onClose={() => setPanelOpen(false)}
         people={people}
         userIsAdmin={userIsAdmin}
+        teams={teams}
+        divisions={divisions}
         onPersonAssign={handlePersonAssign}
         onRefresh={handleRefreshPeople}
       />
@@ -283,6 +315,23 @@ export function MapClient({ floor, initialSeats, initialPeople, teams, divisions
         }}
         onMoveStart={handleMoveStart}
       />
+
+      <Dialog open={!!confirmDialog} onOpenChange={(open) => { if (!open) setConfirmDialog(null) }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{confirmDialog?.title}</DialogTitle>
+            <DialogDescription>{confirmDialog?.description}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => { confirmDialog?.onConfirm(); setConfirmDialog(null) }}>
+              Confirm
+            </Button>
+            <Button variant="ghost" onClick={() => setConfirmDialog(null)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

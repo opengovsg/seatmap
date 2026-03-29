@@ -1,3 +1,38 @@
+## 2026-03-29 — People Panel Polish + Bug Fixes
+
+**Changes:**
+- Created `PersonModal.tsx`: shared add/edit dialog with Name + Team + Division comboboxes using existing team/division lists; supports both create (`createPerson`) and edit (`updatePerson`) modes via optional `person` prop
+- Fixed `__new__` sentinel leaking into combobox input — replaced inline creation in `PersonPicker` with a "Add new person" item at the bottom of the dropdown list (separated by `ComboboxSeparator`), opening `PersonModal` as a nested dialog
+- Added Division field to `UnseatedPanel` add-person form (was missing, only Name + Team existed)
+- Upgraded seat modal tabs to `variant="line"` underline style
+- Clicking a person row in the panel now opens `PersonModal` in edit mode
+- Replaced three separate Unseated/Seated/Archived sections in panel with badge filter tabs (outline = unselected, default = selected)
+- Added `unarchivePerson` server action; `listPeople` now returns all people including archived
+- Added `unassignSeatByPersonId` convenience action for unassigning directly from the panel
+- `PersonRow` replaced with three-dot `DropdownMenu`: Assign/Move button + Edit/Archive/Unarchive/Unassign in dropdown (admin-gated where appropriate)
+- Occupied seat edit modal now calls `updatePerson` (name/team/division) + `updateSeat` (label/notes only) when `person_id` exists; falls back to `updateSeat` for legacy free-text seats
+- Both `window.confirm` calls replaced with shadcn `Dialog` confirmation (move/swap and assign-to-occupied flows)
+- `moveSeat` updated to handle RESERVED destination: reservation transfers to the vacated seat instead of being overwritten; confirmation dialog explains the transfer
+- Added "Reserve seat" helper text: "Use this function when you haven't identified the hire yet."
+- `person_id` now synced during all swap/move operations in `moveSeat`
+
+**Decisions:**
+- Shared `PersonModal` for add and edit — avoids duplicate form logic and field inconsistency; triggered from both the panel and the seat modal
+- Filter tabs instead of stacked sections — cleaner for longer people lists; archived people now visible but separated
+- `unassignSeatByPersonId` in `people.ts` rather than requiring the panel to know seat IDs — keeps the panel action surface simple
+- `listPeople` now returns archived people — panel owns the filtering, server doesn't need to know the UI state
+
+**Current state:**
+All TypeScript-clean. People panel is fully functional with filter tabs, three-dot menus, edit modal, archive/unarchive. Seat modal uses person picker with nested PersonModal for creation. Move/swap flow handles reserved seats correctly with confirmation dialogs throughout.
+
+**Next steps:**
+- Test the full people panel flow end-to-end: add → assign → edit → unassign → archive → unarchive
+- Test move-to-reserved-seat: confirm reservation transfers to vacated seat
+- Consider adding a count badge on the `Users` toggle button showing unseated count
+- Consider whether the "Move" button in the seated row should close the panel and enter move mode on the map (vs the current assign flow)
+
+---
+
 ## 2026-03-29 — Person Entity + Unseated Panel
 
 **Changes:**

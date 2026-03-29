@@ -1,62 +1,63 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { X, Plus, Search, UserRound } from 'lucide-react'
+import { X, Plus, Search, UserRound, MoreHorizontal, ArrowRightLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Label } from '@/components/ui/label'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import type { Person } from '@/types'
-import { createPerson, archivePerson } from '@/app/actions/people'
+import { archivePerson, unarchivePerson, unassignSeatByPersonId } from '@/app/actions/people'
+import { PersonModal } from './PersonModal'
 
 interface UnseatedPanelProps {
   open: boolean
   onClose: () => void
   people: Person[]
   userIsAdmin: boolean
+  teams: string[]
+  divisions: string[]
   onPersonAssign: (person: Person) => void
   onRefresh: () => Promise<void>
 }
 
-export function UnseatedPanel({ open, onClose, people, userIsAdmin, onPersonAssign, onRefresh }: UnseatedPanelProps) {
-  const [search, setSearch]           = useState('')
-  const [showAdd, setShowAdd]         = useState(false)
-  const [newName, setNewName]         = useState('')
-  const [newTeam, setNewTeam]         = useState('')
-  const [newDivision, setNewDivision] = useState('')
-  const [error, setError]             = useState<string | null>(null)
-  const [isPending, startTransition]  = useTransition()
+type FilterTab = 'unseated' | 'seated' | 'archived'
 
-  const unseated = people.filter(p => !p.seat)
-  const seated   = people.filter(p =>  p.seat)
+export function UnseatedPanel({ open, onClose, people, userIsAdmin, teams, divisions, onPersonAssign, onRefresh }: UnseatedPanelProps) {
+  const [search, setSearch]               = useState('')
+  const [filter, setFilter]               = useState<FilterTab>('unseated')
+  const [showAdd, setShowAdd]             = useState(false)
+  const [editingPerson, setEditingPerson] = useState<Person | null>(null)
+  const [isPending, startTransition]      = useTransition()
 
-  const filtered = (list: Person[]) =>
-    list.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
+  const unseated = people.filter(p => !p.is_archived && !p.seat)
+  const seated   = people.filter(p => !p.is_archived &&  p.seat)
+  const archived = people.filter(p =>  p.is_archived)
 
-  function handleAddPerson(e: React.FormEvent) {
-    e.preventDefault()
-    if (!newName.trim()) return
-    setError(null)
-    startTransition(async () => {
-      try {
-        await createPerson(newName.trim(), newTeam.trim(), newDivision.trim())
-        await onRefresh()
-        setNewName(''); setNewTeam(''); setNewDivision('')
-        setShowAdd(false)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to add person.')
-      }
-    })
-  }
+  const counts = { unseated: unseated.length, seated: seated.length, archived: archived.length }
+
+  const activeList = filter === 'unseated' ? unseated : filter === 'seated' ? seated : archived
+
+  const filtered = activeList.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
 
   function handleArchive(person: Person) {
     startTransition(async () => {
-      try {
-        await archivePerson(person.id)
-        await onRefresh()
-      } catch {
-        // silently ignore
-      }
+      try { await archivePerson(person.id); await onRefresh() } catch { /* ignore */ }
+    })
+  }
+
+  function handleUnarchive(person: Person) {
+    startTransition(async () => {
+      try { await unarchivePerson(person.id); await onRefresh() } catch { /* ignore */ }
+    })
+  }
+
+  function handleUnassign(person: Person) {
+    startTransition(async () => {
+      try { await unassignSeatByPersonId(person.id); await onRefresh() } catch { /* ignore */ }
     })
   }
 
@@ -64,25 +65,21 @@ export function UnseatedPanel({ open, onClose, people, userIsAdmin, onPersonAssi
     <>
       {/* Backdrop */}
       {open && (
-        <div
-          className="fixed inset-0 z-30 bg-black/20"
-          onClick={onClose}
-        />
+        <div className="fixed inset-0 z-30 bg-black/20" onClick={onClose} />
       )}
 
       {/* Slide-in panel */}
-      <div
-        className={[
-          'fixed top-0 left-0 z-40 h-full w-72 bg-background border-r shadow-lg flex flex-col',
-          'transition-transform duration-200',
-          open ? 'translate-x-0' : '-translate-x-full',
-        ].join(' ')}
-      >
+      <div className={[
+        'fixed top-0 left-0 z-40 h-full w-72 bg-background border-r shadow-lg flex flex-col',
+        'transition-transform duration-200',
+        open ? 'translate-x-0' : '-translate-x-full',
+      ].join(' ')}>
+
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b shrink-0">
           <span className="font-semibold text-sm">People</span>
           <div className="flex items-center gap-1">
-            <Button size="icon-sm" variant="ghost" onClick={() => setShowAdd(v => !v)} title="Add person">
+            <Button size="icon-sm" variant="ghost" onClick={() => setShowAdd(true)} title="Add person">
               <Plus className="size-4" />
             </Button>
             <Button size="icon-sm" variant="ghost" onClick={onClose}>
@@ -90,31 +87,6 @@ export function UnseatedPanel({ open, onClose, people, userIsAdmin, onPersonAssi
             </Button>
           </div>
         </div>
-
-        {/* Add person form */}
-        {showAdd && (
-          <form onSubmit={handleAddPerson} className="px-4 py-3 border-b flex flex-col gap-2 shrink-0 bg-muted/40">
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="new-name" className="text-xs">Name *</Label>
-              <Input id="new-name" value={newName} onChange={e => setNewName(e.target.value)}
-                placeholder="Full name" autoFocus className="h-8 text-sm" />
-            </div>
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="new-team" className="text-xs">Team</Label>
-              <Input id="new-team" value={newTeam} onChange={e => setNewTeam(e.target.value)}
-                placeholder="Optional" className="h-8 text-sm" />
-            </div>
-            <div className="flex gap-2">
-              <Button type="submit" size="sm" disabled={isPending || !newName.trim()} className="flex-1">
-                {isPending ? 'Adding…' : 'Add'}
-              </Button>
-              <Button type="button" size="sm" variant="ghost" onClick={() => setShowAdd(false)}>
-                Cancel
-              </Button>
-            </div>
-            {error && <p className="text-xs text-destructive">{error}</p>}
-          </form>
-        )}
 
         {/* Search */}
         <div className="px-4 py-2 border-b shrink-0">
@@ -129,75 +101,86 @@ export function UnseatedPanel({ open, onClose, people, userIsAdmin, onPersonAssi
           </div>
         </div>
 
+        {/* Filter badges */}
+        <div className="px-4 py-2 border-b shrink-0 flex gap-1.5">
+          {(['unseated', 'seated', 'archived'] as FilterTab[]).map(tab => (
+            <Badge
+              key={tab}
+              variant={filter === tab ? 'default' : 'outline'}
+              className="cursor-pointer capitalize"
+              render={<button onClick={() => setFilter(tab)} />}
+            >
+              {tab} {counts[tab] > 0 && `(${counts[tab]})`}
+            </Badge>
+          ))}
+        </div>
+
         {/* List */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-4">
-
-          {/* Unseated */}
-          <section>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-              Unseated ({filtered(unseated).length})
-            </p>
-            {filtered(unseated).length === 0 ? (
-              <p className="text-xs text-muted-foreground">No unseated people.</p>
-            ) : (
-              <ul className="flex flex-col gap-1">
-                {filtered(unseated).map(person => (
-                  <PersonRow
-                    key={person.id}
-                    person={person}
-                    userIsAdmin={userIsAdmin}
-                    onAssign={() => { onClose(); onPersonAssign(person) }}
-                    onArchive={() => handleArchive(person)}
-                    isPending={isPending}
-                  />
-                ))}
-              </ul>
-            )}
-          </section>
-
-          {/* Seated */}
-          {seated.length > 0 && (
-            <section>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-                Seated ({filtered(seated).length})
-              </p>
-              <ul className="flex flex-col gap-1">
-                {filtered(seated).map(person => (
-                  <PersonRow
-                    key={person.id}
-                    person={person}
-                    userIsAdmin={userIsAdmin}
-                    onArchive={() => handleArchive(person)}
-                    isPending={isPending}
-                  />
-                ))}
-              </ul>
-            </section>
+        <div className="flex-1 overflow-y-auto px-4 py-3">
+          {filtered.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No {filter} people.</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {filtered.map(person => (
+                <PersonRow
+                  key={person.id}
+                  person={person}
+                  userIsAdmin={userIsAdmin}
+                  onEdit={() => setEditingPerson(person)}
+                  onAssign={filter === 'unseated' ? () => { onClose(); onPersonAssign(person) } : undefined}
+                  onUnassign={filter === 'seated' ? () => handleUnassign(person) : undefined}
+                  onArchive={filter !== 'archived' ? () => handleArchive(person) : undefined}
+                  onUnarchive={filter === 'archived' ? () => handleUnarchive(person) : undefined}
+                  isPending={isPending}
+                />
+              ))}
+            </ul>
           )}
         </div>
       </div>
+
+      {/* Add person modal */}
+      <PersonModal
+        open={showAdd}
+        onClose={() => setShowAdd(false)}
+        onSaved={async () => { setShowAdd(false); await onRefresh() }}
+        teams={teams}
+        divisions={divisions}
+      />
+
+      {/* Edit person modal */}
+      <PersonModal
+        key={editingPerson?.id}
+        open={!!editingPerson}
+        person={editingPerson ?? undefined}
+        onClose={() => setEditingPerson(null)}
+        onSaved={async () => { setEditingPerson(null); await onRefresh() }}
+        teams={teams}
+        divisions={divisions}
+      />
     </>
   )
 }
 
-function PersonRow({ person, userIsAdmin, onAssign, onArchive, isPending }: {
+function PersonRow({ person, userIsAdmin, onEdit, onAssign, onUnassign, onArchive, onUnarchive, isPending }: {
   person: Person
   userIsAdmin: boolean
+  onEdit: () => void
   onAssign?: () => void
-  onArchive: () => void
+  onUnassign?: () => void
+  onArchive?: () => void
+  onUnarchive?: () => void
   isPending: boolean
 }) {
-  const [hover, setHover] = useState(false)
-
   return (
-    <li
-      className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/60 transition-colors group"
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-    >
+    <li className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/60 transition-colors group">
       <UserRound className="size-4 text-muted-foreground shrink-0" />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{person.name}</p>
+
+      {/* Name / meta — clickable to edit */}
+      <div className="flex-1 min-w-0 cursor-pointer" onClick={onEdit}>
+        <p className={`text-sm font-medium truncate ${person.is_archived ? 'text-muted-foreground line-through' : ''}`}>
+          {person.name}
+        </p>
         {(person.team || person.division) && (
           <p className="text-xs text-muted-foreground truncate">
             {[person.team, person.division].filter(Boolean).join(' · ')}
@@ -207,24 +190,59 @@ function PersonRow({ person, userIsAdmin, onAssign, onArchive, isPending }: {
           <Badge variant="secondary" className="text-xs mt-0.5">{person.seat.label}</Badge>
         )}
       </div>
-      <div className="flex gap-1 shrink-0">
-        {onAssign && !person.seat && (
-          <Button size="icon-sm" variant="ghost" onClick={onAssign} title="Assign to seat" className="opacity-0 group-hover:opacity-100">
+
+      {/* Action buttons — visible on hover */}
+      <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100">
+        {/* Assign (unseated) or Move (seated) button */}
+        {onAssign && (
+          <Button size="icon-sm" variant="ghost" onClick={onAssign} title="Assign to seat">
             <Plus className="size-3.5" />
           </Button>
         )}
-        {userIsAdmin && hover && (
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            onClick={onArchive}
-            disabled={isPending}
-            title="Archive person"
-            className="text-muted-foreground hover:text-destructive"
-          >
-            <X className="size-3.5" />
+        {onUnassign && (
+          <Button size="icon-sm" variant="ghost" onClick={onUnassign} title="Move to another seat" disabled={isPending}>
+            <ArrowRightLeft className="size-3.5" />
           </Button>
         )}
+
+        {/* Three-dot menu */}
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            className="flex items-center justify-center size-6 rounded-md hover:bg-accent transition-colors outline-none"
+            title="More options"
+          >
+            <MoreHorizontal className="size-3.5" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-36">
+            <DropdownMenuItem onClick={onEdit}>Edit</DropdownMenuItem>
+            {onUnassign && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onUnassign} disabled={isPending}>
+                  Unassign
+                </DropdownMenuItem>
+              </>
+            )}
+            {userIsAdmin && (
+              <>
+                <DropdownMenuSeparator />
+                {onUnarchive ? (
+                  <DropdownMenuItem onClick={onUnarchive} disabled={isPending}>
+                    Unarchive
+                  </DropdownMenuItem>
+                ) : onArchive ? (
+                  <DropdownMenuItem
+                    onClick={onArchive}
+                    disabled={isPending}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    Archive
+                  </DropdownMenuItem>
+                ) : null}
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </li>
   )

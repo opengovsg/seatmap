@@ -9,10 +9,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Combobox, ComboboxInput, ComboboxContent, ComboboxList, ComboboxItem, ComboboxEmpty } from '@/components/ui/combobox'
+import { Combobox, ComboboxInput, ComboboxContent, ComboboxList, ComboboxItem, ComboboxEmpty, ComboboxSeparator } from '@/components/ui/combobox'
+import { UserPlus } from 'lucide-react'
 import type { Seat, Person } from '@/types'
 import { assignSeat, unassignSeat, reserveSeat, makeAvailable, updateSeat, restoreSeat } from '@/app/actions/seats'
-import { createPerson } from '@/app/actions/people'
+import { updatePerson } from '@/app/actions/people'
+import { PersonModal } from './PersonModal'
 import { toast } from 'sonner'
 
 function toastTimestamp() {
@@ -52,37 +54,22 @@ function TeamCombobox({ value, onChange, teams }: {
   )
 }
 
-// ── Person picker + inline creation ─────────────────────────────────────────
-// Shows unseated people. If the typed name doesn't match anyone, shows
-// an "Add [name]" option to create them inline.
+// ── Person picker ─────────────────────────────────────────────────────────────
+// Shows unseated people. A "New person" button opens PersonModal to create one.
 function PersonPicker({
   unseatedPeople,
-  selectedId,
+  selectedPerson,
   onSelect,
-  newName,
-  onNewName,
-  newTeam,
-  onNewTeam,
-  newDivision,
-  onNewDivision,
-  teams,
-  divisions,
+  onNewPersonRequested,
   notes,
   onNotes,
   isPending,
   onSubmit,
 }: {
   unseatedPeople: Person[]
-  selectedId: string | null
+  selectedPerson: Person | null
   onSelect: (person: Person | null) => void
-  newName: string
-  onNewName: (v: string) => void
-  newTeam: string
-  onNewTeam: (v: string) => void
-  newDivision: string
-  onNewDivision: (v: string) => void
-  teams: string[]
-  divisions: string[]
+  onNewPersonRequested: () => void
   notes: string
   onNotes: (v: string) => void
   isPending: boolean
@@ -90,32 +77,9 @@ function PersonPicker({
 }) {
   const [search, setSearch] = useState('')
 
-  const selectedPerson = unseatedPeople.find(p => p.id === selectedId) ?? null
-
   const filtered = unseatedPeople.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase())
   )
-
-  const showCreateOption = search.trim().length > 0 &&
-    !filtered.some(p => p.name.toLowerCase() === search.trim().toLowerCase())
-
-  const isNewPerson = selectedId === '__new__'
-  const canSubmit = isNewPerson ? newName.trim().length > 0 : selectedId !== null
-
-  function handleSelect(personId: string | null) {
-    if (personId === '__new__') {
-      onNewName(search.trim())
-      onSelect({ id: '__new__', name: search.trim(), team: null, division: null, is_archived: false, created_at: '' })
-    } else {
-      const person = unseatedPeople.find(p => p.id === personId) ?? null
-      onSelect(person)
-    }
-  }
-
-  function handleClear() {
-    onSelect(null)
-    setSearch('')
-  }
 
   return (
     <div className="grid gap-3 pt-3">
@@ -123,11 +87,15 @@ function PersonPicker({
         <div className="grid gap-1.5">
           <Label>Person *</Label>
           <div onChange={(e) => setSearch((e.target as HTMLInputElement).value)}>
-            <Combobox value={selectedId} onValueChange={handleSelect}>
+            <Combobox value={null} onValueChange={(id) => {
+              if (id === '__new__') { onNewPersonRequested(); return }
+              const person = unseatedPeople.find(p => p.id === id) ?? null
+              onSelect(person)
+            }}>
               <ComboboxInput
-                placeholder="Search people…"
-                showTrigger={unseatedPeople.length > 0}
-                showClear={!!selectedId}
+                placeholder="Search unseated people…"
+                showTrigger
+                showClear={false}
                 className="w-full"
                 autoFocus
               />
@@ -143,14 +111,14 @@ function PersonPicker({
                       )}
                     </ComboboxItem>
                   ))}
-                  {showCreateOption && (
-                    <ComboboxItem value="__new__">
-                      Add &ldquo;{search.trim()}&rdquo;
-                    </ComboboxItem>
-                  )}
-                  {filtered.length === 0 && !showCreateOption && (
+                  {filtered.length === 0 && (
                     <ComboboxEmpty>No unseated people found</ComboboxEmpty>
                   )}
+                  <ComboboxSeparator />
+                  <ComboboxItem value="__new__" className="py-2">
+                    <UserPlus className="size-3.5 mr-1.5" />
+                    Add new person
+                  </ComboboxItem>
                 </ComboboxList>
               </ComboboxContent>
             </Combobox>
@@ -161,18 +129,17 @@ function PersonPicker({
           <Label>Person</Label>
           <div className="flex items-center justify-between rounded-md border px-3 py-2 text-sm bg-muted/40">
             <div>
-              <span className="font-medium">{isNewPerson ? newName : selectedPerson.name}</span>
-              {!isNewPerson && (selectedPerson.team || selectedPerson.division) && (
+              <span className="font-medium">{selectedPerson.name}</span>
+              {(selectedPerson.team || selectedPerson.division) && (
                 <span className="ml-1.5 text-xs text-muted-foreground">
                   {[selectedPerson.team, selectedPerson.division].filter(Boolean).join(' · ')}
                 </span>
               )}
-              {isNewPerson && <span className="ml-1.5 text-xs text-muted-foreground">New person</span>}
             </div>
             <button
               type="button"
               className="text-xs text-muted-foreground underline"
-              onClick={handleClear}
+              onClick={() => onSelect(null)}
             >
               Change
             </button>
@@ -180,35 +147,11 @@ function PersonPicker({
         </div>
       )}
 
-      {/* Extra fields only when creating a new person inline */}
-      {isNewPerson && (
-        <>
-          <div className="grid gap-1.5">
-            <Label htmlFor="new-person-name">Name *</Label>
-            <Input
-              id="new-person-name"
-              value={newName}
-              onChange={e => onNewName(e.target.value)}
-              placeholder="Full name"
-              autoFocus
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <Label>Team</Label>
-            <TeamCombobox value={newTeam} onChange={onNewTeam} teams={teams} />
-          </div>
-          <div className="grid gap-1.5">
-            <Label>Division</Label>
-            <TeamCombobox value={newDivision} onChange={onNewDivision} teams={divisions} />
-          </div>
-        </>
-      )}
-
       <div className="grid gap-1.5">
         <Label htmlFor="assign-notes">Notes</Label>
         <Input id="assign-notes" value={notes} onChange={e => onNotes(e.target.value)} placeholder="Optional" />
       </div>
-      <Button size="lg" disabled={isPending || !canSubmit} onClick={onSubmit} className="mt-1 w-full">
+      <Button size="lg" disabled={isPending || !selectedPerson} onClick={onSubmit} className="mt-1 w-full">
         {isPending ? 'Saving…' : 'Assign'}
       </Button>
     </div>
@@ -223,6 +166,7 @@ function ReserveForm({ notes, onNotes, team, onTeam, teams, isPending, onSubmit 
 }) {
   return (
     <div className="grid gap-3 pt-3">
+      <p className="text-xs text-muted-foreground">Use this function when you haven&apos;t identified the hire yet.</p>
       <div className="grid gap-1.5">
         <Label htmlFor="reserve-reason">Reason</Label>
         <Input id="reserve-reason" value={notes} onChange={e => onNotes(e.target.value)} placeholder="e.g. Holding for Design hire" autoFocus />
@@ -251,25 +195,16 @@ interface SeatModalProps {
 }
 
 export function SeatModal({ seat, teams, divisions, unseatedPeople, initialPerson, onClose, onUpdated, onMoveStart }: SeatModalProps) {
+  // Open straight to assign mode if a person was pre-selected from the panel
   const [mode, setMode] = useState<Mode>(() =>
-    // If a person was pre-selected from the panel, open straight to assign mode
     initialPerson && seat?.status !== 'OCCUPIED' ? 'edit' : 'view'
   )
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  // Person picker state — pre-populated when coming from the panel
+  // Person picker state
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(initialPerson ?? null)
-  const [newName,     setNewName]     = useState('')
-  const [newTeam,     setNewTeam]     = useState('')
-  const [newDivision, setNewDivision] = useState('')
-
-  // Edit mode state
-  const [editName,     setEditName]     = useState('')
-  const [editTeam,     setEditTeam]     = useState('')
-  const [editDivision, setEditDivision] = useState('')
-  const [editNotes,    setEditNotes]    = useState('')
-  const [editLabel,    setEditLabel]    = useState('')
+  const [showPersonModal, setShowPersonModal] = useState(false)
 
   // Shared notes for assign forms
   const [notes, setNotes] = useState('')
@@ -278,6 +213,13 @@ export function SeatModal({ seat, teams, divisions, unseatedPeople, initialPerso
   const [reserveNotes, setReserveNotes] = useState('')
   const [reserveTeam,  setReserveTeam]  = useState('')
 
+  // Edit mode state
+  const [editName,     setEditName]     = useState('')
+  const [editTeam,     setEditTeam]     = useState('')
+  const [editDivision, setEditDivision] = useState('')
+  const [editNotes,    setEditNotes]    = useState('')
+  const [editLabel,    setEditLabel]    = useState('')
+
   // Confirmation for assigning to a reserved seat
   const [showReservedConfirm, setShowReservedConfirm] = useState(false)
 
@@ -285,7 +227,6 @@ export function SeatModal({ seat, teams, divisions, unseatedPeople, initialPerso
     setMode('view')
     setError(null)
     setSelectedPerson(null)
-    setNewName(''); setNewTeam(''); setNewDivision('')
     setNotes('')
     setShowReservedConfirm(false)
     onClose()
@@ -321,25 +262,13 @@ export function SeatModal({ seat, teams, divisions, unseatedPeople, initialPerso
     })
   }
 
-  // Resolve the person ID to use for assignment — creates inline if needed
-  async function resolvePersonId(): Promise<string> {
-    if (selectedPerson?.id === '__new__') {
-      const created = await createPerson(newName.trim(), newTeam.trim(), newDivision.trim())
-      return created.id
-    }
-    if (!selectedPerson) throw new Error('No person selected.')
-    return selectedPerson.id
-  }
-
   function handleAssignSubmit() {
+    if (!selectedPerson) return
     if (seat?.status === 'RESERVED' && !showReservedConfirm) {
       setShowReservedConfirm(true)
       return
     }
-    run(async () => {
-      const personId = await resolvePersonId()
-      await assignSeat(seat!.id, personId, notes.trim())
-    }, 'Seat has been assigned.')
+    run(() => assignSeat(seat!.id, selectedPerson.id, notes.trim()), 'Seat has been assigned.')
   }
 
   const enterEdit = () => {
@@ -353,7 +282,6 @@ export function SeatModal({ seat, teams, divisions, unseatedPeople, initialPerso
 
   const enterAssign = () => {
     setSelectedPerson(null)
-    setNewName(''); setNewTeam(''); setNewDivision('')
     setNotes('')
     setShowReservedConfirm(false)
     setMode('edit')
@@ -362,170 +290,190 @@ export function SeatModal({ seat, teams, divisions, unseatedPeople, initialPerso
   if (!seat) return null
 
   return (
-    <Dialog open={!!seat} onOpenChange={(open) => { if (!open) close() }}>
-      <DialogContent className="sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 flex-wrap">
-            {seat.label}
-            <Badge variant={STATUS_VARIANTS[seat.status]}>{STATUS_LABELS[seat.status]}</Badge>
-          </DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={!!seat} onOpenChange={(open) => { if (!open) close() }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 flex-wrap">
+              {seat.label}
+              <Badge variant={STATUS_VARIANTS[seat.status]}>{STATUS_LABELS[seat.status]}</Badge>
+            </DialogTitle>
+          </DialogHeader>
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p className="text-sm text-destructive">{error}</p>}
 
-        {/* ── AVAILABLE: tabs ── */}
-        {seat.status === 'AVAILABLE' && (
-          <Tabs defaultValue="assign">
-            <TabsList className="w-full">
-              <TabsTrigger value="assign" className="flex-1">Assign seat</TabsTrigger>
-              <TabsTrigger value="reserve" className="flex-1">Reserve seat</TabsTrigger>
-            </TabsList>
-            <TabsContent value="assign" className="min-h-[268px]">
+          {/* ── AVAILABLE: tabs ── */}
+          {seat.status === 'AVAILABLE' && (
+            <Tabs defaultValue="assign">
+              <TabsList variant="line" className="w-full border-b rounded-none">
+                <TabsTrigger value="assign" className="flex-1">Assign seat</TabsTrigger>
+                <TabsTrigger value="reserve" className="flex-1">Reserve seat</TabsTrigger>
+              </TabsList>
+              <TabsContent value="assign" className="min-h-[268px]">
+                <PersonPicker
+                  unseatedPeople={unseatedPeople}
+                  selectedPerson={selectedPerson}
+                  onSelect={setSelectedPerson}
+                  onNewPersonRequested={() => setShowPersonModal(true)}
+                  notes={notes} onNotes={setNotes}
+                  isPending={isPending}
+                  onSubmit={handleAssignSubmit}
+                />
+              </TabsContent>
+              <TabsContent value="reserve" className="min-h-[268px]">
+                <ReserveForm
+                  notes={reserveNotes} onNotes={setReserveNotes}
+                  team={reserveTeam} onTeam={setReserveTeam}
+                  teams={teams} isPending={isPending}
+                  onSubmit={() => run(() => reserveSeat(seat.id, reserveNotes.trim()), 'Seat has been reserved.')}
+                />
+              </TabsContent>
+            </Tabs>
+          )}
+
+          {/* ── OCCUPIED: view ── */}
+          {seat.status === 'OCCUPIED' && mode === 'view' && (
+            <>
+              <div className="text-sm space-y-1">
+                {seat.occupant_name && (
+                  <p className="font-medium">
+                    {seat.occupant_name}
+                    {seat.occupant_team && <span className="font-normal text-muted-foreground"> · {seat.occupant_team}</span>}
+                  </p>
+                )}
+                {seat.notes && <p className="text-muted-foreground">{seat.notes}</p>}
+              </div>
+              <DialogFooter>
+                <Button size="lg" onClick={enterEdit}>Edit</Button>
+                <Button size="lg" variant="outline" onClick={() => { close(); onMoveStart(seat) }}>Move</Button>
+                <Button size="lg" variant="outline" disabled={isPending}
+                  onClick={() => run(() => unassignSeat(seat.id), 'Seat has been unassigned.')}>Unassign</Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {/* ── OCCUPIED: edit ── */}
+          {seat.status === 'OCCUPIED' && mode === 'edit' && (
+            <>
+              <div className="grid gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="edit-label">Seat label</Label>
+                  <Input id="edit-label" value={editLabel} onChange={e => setEditLabel(e.target.value)} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="edit-name">Name *</Label>
+                  <Input id="edit-name" value={editName} onChange={e => setEditName(e.target.value)} autoFocus />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label>Team</Label>
+                  <TeamCombobox value={editTeam} onChange={setEditTeam} teams={teams} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label>Division</Label>
+                  <TeamCombobox value={editDivision} onChange={setEditDivision} teams={divisions} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="edit-notes">Notes</Label>
+                  <Input id="edit-notes" value={editNotes} onChange={e => setEditNotes(e.target.value)} />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button size="lg" disabled={isPending || !editName.trim()}
+                  onClick={() => run(async () => {
+                    if (seat.person_id) {
+                      // Person entity exists — update person record (syncs cache fields automatically)
+                      await updatePerson(seat.person_id, {
+                        name: editName.trim(),
+                        team: editTeam.trim() || null,
+                        division: editDivision.trim() || null,
+                      })
+                      // Update label and notes on the seat directly
+                      await updateSeat(seat.id, {
+                        label: editLabel.trim() || undefined,
+                        notes: editNotes.trim() || null,
+                      })
+                    } else {
+                      // Legacy free-text seat — update everything on the seat
+                      await updateSeat(seat.id, {
+                        label: editLabel.trim() || undefined,
+                        occupant_name: editName.trim(),
+                        occupant_team: editTeam.trim() || null,
+                        occupant_division: editDivision.trim() || null,
+                        notes: editNotes.trim() || null,
+                      })
+                    }
+                  }, 'Seat has been updated.')}>
+                  {isPending ? 'Saving…' : 'Save'}
+                </Button>
+                <Button size="lg" variant="ghost" onClick={() => setMode('view')}>Back</Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {/* ── RESERVED: view ── */}
+          {seat.status === 'RESERVED' && mode === 'view' && (
+            <>
+              <div className="text-sm">
+                {seat.notes && <p className="text-muted-foreground">{seat.notes}</p>}
+              </div>
+              <DialogFooter>
+                <Button size="lg" onClick={enterAssign}>Assign person</Button>
+                <Button size="lg" variant="outline" disabled={isPending}
+                  onClick={() => run(() => makeAvailable(seat.id), 'Seat has been made available.')}>Make available</Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {/* ── RESERVED: assign ── */}
+          {seat.status === 'RESERVED' && mode === 'edit' && !showReservedConfirm && (
+            <>
               <PersonPicker
                 unseatedPeople={unseatedPeople}
-                selectedId={selectedPerson?.id ?? null}
+                selectedPerson={selectedPerson}
                 onSelect={setSelectedPerson}
-                newName={newName} onNewName={setNewName}
-                newTeam={newTeam} onNewTeam={setNewTeam}
-                newDivision={newDivision} onNewDivision={setNewDivision}
-                teams={teams} divisions={divisions}
+                onNewPersonRequested={() => setShowPersonModal(true)}
                 notes={notes} onNotes={setNotes}
                 isPending={isPending}
                 onSubmit={handleAssignSubmit}
               />
-            </TabsContent>
-            <TabsContent value="reserve" className="min-h-[268px]">
-              <ReserveForm
-                notes={reserveNotes} onNotes={setReserveNotes}
-                team={reserveTeam} onTeam={setReserveTeam}
-                teams={teams} isPending={isPending}
-                onSubmit={() => run(() => reserveSeat(seat.id, reserveNotes.trim()), 'Seat has been reserved.')}
-              />
-            </TabsContent>
-          </Tabs>
-        )}
+              <Button size="lg" variant="ghost" className="mt-1" onClick={() => setMode('view')}>Back</Button>
+            </>
+          )}
 
-        {/* ── OCCUPIED: view ── */}
-        {seat.status === 'OCCUPIED' && mode === 'view' && (
-          <>
-            <div className="text-sm space-y-1">
-              {seat.occupant_name && (
-                <p className="font-medium">
-                  {seat.occupant_name}
-                  {seat.occupant_team && <span className="font-normal text-muted-foreground"> · {seat.occupant_team}</span>}
-                </p>
-              )}
-              {seat.notes && <p className="text-muted-foreground">{seat.notes}</p>}
+          {/* ── RESERVED: confirmation ── */}
+          {seat.status === 'RESERVED' && mode === 'edit' && showReservedConfirm && (
+            <div className="grid gap-4 pt-2">
+              <p className="text-sm text-muted-foreground">
+                This seat is reserved
+                {seat.notes ? <> for: <span className="font-medium text-foreground">{seat.notes}</span></> : '.'}{' '}
+                Assign{' '}
+                <span className="font-medium text-foreground">{selectedPerson?.name}</span>{' '}
+                anyway?
+              </p>
+              <DialogFooter>
+                <Button size="lg" disabled={isPending} onClick={() =>
+                  run(() => assignSeat(seat.id, selectedPerson!.id, notes.trim()), 'Seat has been assigned.')
+                }>
+                  {isPending ? 'Saving…' : 'Confirm assign'}
+                </Button>
+                <Button size="lg" variant="ghost" onClick={() => setShowReservedConfirm(false)}>Back</Button>
+              </DialogFooter>
             </div>
-            <DialogFooter>
-              <Button size="lg" onClick={enterEdit}>Edit</Button>
-              <Button size="lg" variant="outline" onClick={() => { close(); onMoveStart(seat) }}>Move</Button>
-              <Button size="lg" variant="outline" disabled={isPending}
-                onClick={() => run(() => unassignSeat(seat.id), 'Seat has been unassigned.')}>Unassign</Button>
-            </DialogFooter>
-          </>
-        )}
+          )}
+        </DialogContent>
+      </Dialog>
 
-        {/* ── OCCUPIED: edit ── */}
-        {seat.status === 'OCCUPIED' && mode === 'edit' && (
-          <>
-            <div className="grid gap-3">
-              <div className="grid gap-1.5">
-                <Label htmlFor="edit-label">Seat label</Label>
-                <Input id="edit-label" value={editLabel} onChange={e => setEditLabel(e.target.value)} />
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="edit-name">Name *</Label>
-                <Input id="edit-name" value={editName} onChange={e => setEditName(e.target.value)} autoFocus />
-              </div>
-              <div className="grid gap-1.5">
-                <Label>Team</Label>
-                <TeamCombobox value={editTeam} onChange={setEditTeam} teams={teams} />
-              </div>
-              <div className="grid gap-1.5">
-                <Label>Division</Label>
-                <TeamCombobox value={editDivision} onChange={setEditDivision} teams={divisions} />
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="edit-notes">Notes</Label>
-                <Input id="edit-notes" value={editNotes} onChange={e => setEditNotes(e.target.value)} />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button size="lg" disabled={isPending || !editName.trim()}
-                onClick={() => run(() => updateSeat(seat.id, {
-                  label: editLabel.trim() || undefined,
-                  occupant_name: editName.trim(),
-                  occupant_team: editTeam.trim() || null,
-                  occupant_division: editDivision.trim() || null,
-                  notes: editNotes.trim() || null,
-                }), 'Seat has been updated.')}>
-                {isPending ? 'Saving…' : 'Save'}
-              </Button>
-              <Button size="lg" variant="ghost" onClick={() => setMode('view')}>Back</Button>
-            </DialogFooter>
-          </>
-        )}
-
-        {/* ── RESERVED: view ── */}
-        {seat.status === 'RESERVED' && mode === 'view' && (
-          <>
-            <div className="text-sm">
-              {seat.notes && <p className="text-muted-foreground">{seat.notes}</p>}
-            </div>
-            <DialogFooter>
-              <Button size="lg" onClick={enterAssign}>Assign person</Button>
-              <Button size="lg" variant="outline" disabled={isPending}
-                onClick={() => run(() => makeAvailable(seat.id), 'Seat has been made available.')}>Make available</Button>
-            </DialogFooter>
-          </>
-        )}
-
-        {/* ── RESERVED: assign ── */}
-        {seat.status === 'RESERVED' && mode === 'edit' && !showReservedConfirm && (
-          <>
-            <PersonPicker
-              unseatedPeople={unseatedPeople}
-              selectedId={selectedPerson?.id ?? null}
-              onSelect={setSelectedPerson}
-              newName={newName} onNewName={setNewName}
-              newTeam={newTeam} onNewTeam={setNewTeam}
-              newDivision={newDivision} onNewDivision={setNewDivision}
-              teams={teams} divisions={divisions}
-              notes={notes} onNotes={setNotes}
-              isPending={isPending}
-              onSubmit={handleAssignSubmit}
-            />
-            <Button size="lg" variant="ghost" className="mt-1" onClick={() => setMode('view')}>Back</Button>
-          </>
-        )}
-
-        {/* ── RESERVED: confirmation ── */}
-        {seat.status === 'RESERVED' && mode === 'edit' && showReservedConfirm && (
-          <div className="grid gap-4 pt-2">
-            <p className="text-sm text-muted-foreground">
-              This seat is reserved
-              {seat.notes ? <> for: <span className="font-medium text-foreground">{seat.notes}</span></> : '.'}{' '}
-              Assign{' '}
-              <span className="font-medium text-foreground">
-                {selectedPerson?.id === '__new__' ? newName : selectedPerson?.name}
-              </span>{' '}
-              anyway?
-            </p>
-            <DialogFooter>
-              <Button size="lg" disabled={isPending} onClick={() => {
-                run(async () => {
-                  const personId = await resolvePersonId()
-                  await assignSeat(seat.id, personId, notes.trim())
-                }, 'Seat has been assigned.')
-              }}>
-                {isPending ? 'Saving…' : 'Confirm assign'}
-              </Button>
-              <Button size="lg" variant="ghost" onClick={() => setShowReservedConfirm(false)}>Back</Button>
-            </DialogFooter>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
+      {/* Nested PersonModal — opens on top of the seat modal */}
+      <PersonModal
+        open={showPersonModal}
+        onClose={() => setShowPersonModal(false)}
+        onSaved={(person) => {
+          setSelectedPerson(person)
+          setShowPersonModal(false)
+        }}
+        teams={teams}
+        divisions={divisions}
+      />
+    </>
   )
 }

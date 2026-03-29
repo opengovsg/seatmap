@@ -21,6 +21,15 @@ export interface Seat {
   created_at: string
 }
 
+export interface SeatSnapshot {
+  status: string
+  occupant_name: string | null
+  occupant_team: string | null
+  occupant_division: string | null
+  notes: string | null
+  label: string
+}
+
 export interface AuditLog {
   id: string
   seat_id: string
@@ -29,6 +38,7 @@ export interface AuditLog {
   field: string | null
   old_value: string | null
   new_value: string | null
+  before: SeatSnapshot | null
   created_at: string
   // Joined field
   seat?: { label: string }

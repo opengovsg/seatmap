@@ -163,7 +163,7 @@ export function NavBar({
         <DropdownMenuContent align="end" className="w-48">
           <div className="px-2 py-1.5 text-xs text-muted-foreground truncate">{userEmail}</div>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => router.push('/admin')}>Admin</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => router.push('/admin')}>Admin Panel</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleSignOut}>Log out</DropdownMenuItem>
         </DropdownMenuContent>

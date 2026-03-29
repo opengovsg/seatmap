@@ -1,13 +1,15 @@
 'use client'
 
-import { useRef, useState, useTransition } from 'react'
+import { useRef, useState, useTransition, useMemo } from 'react'
 import {
   useReactTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel,
   flexRender, type ColumnDef, type SortingState,
 } from '@tanstack/react-table'
 import { uploadFloor, restoreSnapshot, listSnapshots, listAuditLogs } from '@/app/actions/floor'
 import { addAdminAction, removeAdminAction, transferOwnershipAction, listAdminsAction } from '@/app/actions/admins'
-import { initializeDraft, publishDraft, discardDraft, getDraftSeatCount } from '@/app/actions/draft'
+import { initializeDraft, publishDraft, discardDraft, getDraftSeatCount, renameDraft } from '@/app/actions/draft'
+import { undoAuditEntry } from '@/app/actions/seats'
+import { StartDraftModal } from '@/components/StartDraftModal'
 import type { UploadResult, Snapshot } from '@/app/actions/floor'
 import type { AdminRecord, AdminRole } from '@/lib/admins'
 import type { AuditLog } from '@/types'
@@ -20,7 +22,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
-import { Upload, RotateCcw, AlertTriangle, ArrowUpDown } from 'lucide-react'
+import { Upload, RotateCcw, AlertTriangle, ArrowUpDown, Undo2 } from 'lucide-react'
 
 // ── Audit log columns ─────────────────────────────────────────────────────────
 const ACTION_STYLES: Record<string, string> = {
@@ -33,64 +35,86 @@ const ACTION_STYLES: Record<string, string> = {
   RESTORE:  'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
 }
 
-const columns: ColumnDef<AuditLog>[] = [
-  {
-    accessorKey: 'created_at',
-    header: ({ column }) => (
-      <button className="flex items-center gap-1 text-left"
-        onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
-        Time <ArrowUpDown className="size-3" />
-      </button>
-    ),
-    cell: ({ row }) => (
-      <span className="text-muted-foreground whitespace-nowrap text-xs">
-        {new Date(row.getValue('created_at')).toLocaleString('en-SG', {
-          dateStyle: 'short', timeStyle: 'short',
-        })}
-      </span>
-    ),
-  },
-  {
-    accessorKey: 'editor_email',
-    header: 'Editor',
-    cell: ({ row }) => <span className="text-sm">{row.getValue('editor_email')}</span>,
-  },
-  {
-    id: 'seat',
-    header: 'Seat',
-    accessorFn: (row) => row.seat?.label ?? '',
-    cell: ({ row }) => (
-      <span className="font-mono text-xs">{row.original.seat?.label ?? '—'}</span>
-    ),
-  },
-  {
-    accessorKey: 'action',
-    header: 'Action',
-    cell: ({ row }) => {
-      const action = row.getValue<string>('action')
-      return (
-        <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full ${ACTION_STYLES[action] ?? 'bg-muted'}`}>
-          {action}
+const UNDOABLE_ACTIONS = new Set(['ASSIGN', 'UNASSIGN', 'MOVE', 'RESERVE', 'UPDATE'])
+
+function makeColumns(onUndo: (log: AuditLog) => void): ColumnDef<AuditLog>[] {
+  return [
+    {
+      accessorKey: 'created_at',
+      header: ({ column }) => (
+        <button className="flex items-center gap-1 text-left"
+          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
+          Time <ArrowUpDown className="size-3" />
+        </button>
+      ),
+      cell: ({ row }) => (
+        <span className="text-muted-foreground whitespace-nowrap text-xs">
+          {new Date(row.getValue('created_at')).toLocaleString('en-SG', {
+            dateStyle: 'short', timeStyle: 'short',
+          })}
         </span>
-      )
+      ),
     },
-  },
-  {
-    id: 'change',
-    header: 'Change',
-    cell: ({ row }) => {
-      const { field, old_value, new_value } = row.original
-      if (!field) return null
-      return (
-        <span className="text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">{field}</span>
-          {old_value && <span> {old_value} →</span>}
-          {new_value && <span> {new_value}</span>}
-        </span>
-      )
+    {
+      accessorKey: 'editor_email',
+      header: 'Editor',
+      cell: ({ row }) => <span className="text-sm">{row.getValue('editor_email')}</span>,
     },
-  },
-]
+    {
+      id: 'seat',
+      header: 'Seat',
+      accessorFn: (row) => row.seat?.label ?? '',
+      cell: ({ row }) => (
+        <span className="font-mono text-xs">{row.original.seat?.label ?? '—'}</span>
+      ),
+    },
+    {
+      accessorKey: 'action',
+      header: 'Action',
+      cell: ({ row }) => {
+        const action = row.getValue<string>('action')
+        return (
+          <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full ${ACTION_STYLES[action] ?? 'bg-muted'}`}>
+            {action}
+          </span>
+        )
+      },
+    },
+    {
+      id: 'change',
+      header: 'Change',
+      cell: ({ row }) => {
+        const { field, old_value, new_value } = row.original
+        if (!field) return null
+        return (
+          <span className="text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">{field}</span>
+            {old_value && <span> {old_value} →</span>}
+            {new_value && <span> {new_value}</span>}
+          </span>
+        )
+      },
+    },
+    {
+      id: 'undo',
+      header: '',
+      cell: ({ row }) => {
+        const log = row.original
+        if (!UNDOABLE_ACTIONS.has(log.action) || !log.before) return null
+        return (
+          <button
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => onUndo(log)}
+            title="Undo this change"
+          >
+            <Undo2 className="size-3" />
+            Undo
+          </button>
+        )
+      },
+    },
+  ]
+}
 
 // ── Main component ────────────────────────────────────────────────────────────
 interface Props {
@@ -100,11 +124,12 @@ interface Props {
   userEmail: string
   userRole: AdminRole
   isDraft: boolean
+  draftName: string | null
   draftSeatCount: number
   floorId: string
 }
 
-export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, userEmail, userRole, isDraft: initialIsDraft, draftSeatCount: initialDraftSeatCount, floorId }: Props) {
+export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, userEmail, userRole, isDraft: initialIsDraft, draftName: initialDraftName, draftSeatCount: initialDraftSeatCount, floorId }: Props) {
   const fileRef                           = useRef<HTMLInputElement>(null)
   const [snapshots, setSnapshots]         = useState<Snapshot[]>(initialSnapshots)
   const [uploadResult, setUploadResult]   = useState<UploadResult | null>(null)
@@ -117,19 +142,38 @@ export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, user
 
   // ── Draft state ──
   const [isDraft, setIsDraft]             = useState(initialIsDraft)
+  const [draftName, setDraftName]         = useState<string | null>(initialDraftName)
   const [draftSeatCount, setDraftSeatCount] = useState(initialDraftSeatCount)
   const [draftError, setDraftError]       = useState<string | null>(null)
   const [draftConfirm, setDraftConfirm]   = useState<'publish' | 'discard' | null>(null)
+  const [draftModalMode, setDraftModalMode] = useState<'start' | 'rename' | null>(null)
 
-  function handleInitDraft() {
+  function handleInitDraft(name: string) {
     setDraftError(null)
     startTransition(async () => {
       try {
-        await initializeDraft(floorId)
+        await initializeDraft(floorId, name)
         setIsDraft(true)
+        setDraftName(name)
         setDraftSeatCount(await getDraftSeatCount(floorId))
+        setDraftModalMode(null)
       } catch (err) {
         setDraftError(err instanceof Error ? err.message : 'Failed to start draft.')
+        setDraftModalMode(null)
+      }
+    })
+  }
+
+  function handleRenameDraft(name: string) {
+    setDraftError(null)
+    startTransition(async () => {
+      try {
+        await renameDraft(name)
+        setDraftName(name)
+        setDraftModalMode(null)
+      } catch (err) {
+        setDraftError(err instanceof Error ? err.message : 'Failed to rename draft.')
+        setDraftModalMode(null)
       }
     })
   }
@@ -221,11 +265,26 @@ export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, user
     })
   }
 
-  const [logs, setLogs] = useState<AuditLog[]>(initialLogs)
+  const [logs, setLogs]           = useState<AuditLog[]>(initialLogs)
+  const [undoError, setUndoError] = useState<string | null>(null)
 
   async function refreshLogs() {
     setLogs(await listAuditLogs() as AuditLog[])
   }
+
+  function handleUndo(log: AuditLog) {
+    setUndoError(null)
+    startTransition(async () => {
+      try {
+        await undoAuditEntry(log.id)
+        await refreshLogs()
+      } catch (err) {
+        setUndoError(err instanceof Error ? err.message : 'Undo failed.')
+      }
+    })
+  }
+
+  const columns = useMemo(() => makeColumns(handleUndo), [])
 
   const table = useReactTable({
     data: logs,
@@ -282,6 +341,7 @@ export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, user
   }
 
   return (
+    <>
     <div className="flex flex-col gap-8">
 
       {/* ── Draft seating ── */}
@@ -295,15 +355,29 @@ export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, user
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {!isDraft ? (
-            <Button onClick={handleInitDraft} disabled={isPending} className="w-fit">
-              {isPending ? 'Starting…' : 'Start draft'}
+            <Button onClick={() => setDraftModalMode('start')} disabled={isPending} className="w-fit">
+              Start draft
             </Button>
           ) : (
             <>
-              <p className="text-sm text-muted-foreground">
-                Draft is active — <strong className="text-foreground">{draftSeatCount} seats</strong> in draft.
-                Users can edit seats. Changes are not live until published.
-              </p>
+              <div className="flex flex-col gap-0.5">
+                <p className="text-sm text-muted-foreground">
+                  Draft is active — <strong className="text-foreground">{draftSeatCount} seats</strong> in draft.
+                  Changes are not live until published.
+                </p>
+                {draftName && (
+                  <p className="text-sm text-muted-foreground">
+                    Draft name: <strong className="text-foreground">{draftName}</strong>
+                    {' '}
+                    <button
+                      className="text-xs underline underline-offset-2 hover:text-foreground"
+                      onClick={() => setDraftModalMode('rename')}
+                    >
+                      Rename
+                    </button>
+                  </p>
+                )}
+              </div>
               {draftConfirm === 'publish' ? (
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">Publish draft and replace live seating?</span>
@@ -387,6 +461,12 @@ export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, user
           <p className="text-xs text-muted-foreground">
             Showing {table.getRowModel().rows.length} of {initialLogs.length} entries
           </p>
+          {undoError && (
+            <div className="flex items-center gap-2 text-sm text-destructive">
+              <AlertTriangle className="size-4 shrink-0" />
+              {undoError}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -607,5 +687,14 @@ export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, user
       )}
 
     </div>
+
+    <StartDraftModal
+      open={draftModalMode !== null}
+      onClose={() => setDraftModalMode(null)}
+      onConfirm={draftModalMode === 'rename' ? handleRenameDraft : handleInitDraft}
+      isPending={isPending}
+      currentName={draftModalMode === 'rename' ? draftName : undefined}
+    />
+    </>
   )
 }

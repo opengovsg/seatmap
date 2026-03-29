@@ -19,7 +19,7 @@ export default async function AdminPage() {
 
   const db = createAdminClient()
 
-  const [snapshots, logsResult, admins, isDraft, { data: floor }] = await Promise.all([
+  const [snapshots, logsResult, admins, draftState, { data: floor }] = await Promise.all([
     listSnapshots(),
     db
       .from('audit_logs')
@@ -30,6 +30,8 @@ export default async function AdminPage() {
     getDraftState(),
     db.from('floors').select('id').single(),
   ])
+  const isDraft = draftState.isActive
+  const draftName = draftState.name
 
   // Fetch seat labels separately and merge
   const rawLogs = logsResult.data ?? []
@@ -53,7 +55,7 @@ export default async function AdminPage() {
         <a href="/map" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
           ← Back to map
         </a>
-        <h1 className="font-semibold text-sm">Admin</h1>
+        <h1 className="font-semibold text-sm">Admin Panel</h1>
       </header>
       <main className="max-w-5xl mx-auto px-6 py-10">
         <AdminClient
@@ -63,6 +65,7 @@ export default async function AdminPage() {
           userEmail={email}
           userRole={userRole}
           isDraft={isDraft}
+          draftName={draftName}
           draftSeatCount={draftSeatCount}
           floorId={floor?.id ?? ''}
         />

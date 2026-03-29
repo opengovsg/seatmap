@@ -16,11 +16,13 @@ export default async function MapPage() {
 
   const db = createAdminClient()
 
-  const [{ data: floor }, isDraft, userIsAdmin] = await Promise.all([
+  const [{ data: floor }, draftState, userIsAdmin] = await Promise.all([
     db.from('floors').select('id, name, svg_content').single(),
     getDraftState(),
     isAdmin(user.email ?? ''),
   ])
+  const isDraft = draftState.isActive
+  const draftName = draftState.name
 
   if (!floor) {
     return (
@@ -80,6 +82,7 @@ export default async function MapPage() {
         divisions={divisions}
         userEmail={user.email ?? ''}
         isDraft={isDraft}
+        draftName={draftName}
         userIsAdmin={userIsAdmin}
       />
     </div>

@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 
 export type AdminRole = 'owner' | 'admin'
+export type UserRole = 'owner' | 'admin' | 'user'
 
 export interface AdminRecord {
   email: string
@@ -25,6 +26,12 @@ export async function isAdmin(email: string): Promise<boolean> {
 export async function isOwner(email: string): Promise<boolean> {
   const record = await getAdminRecord(email)
   return record?.role === 'owner'
+}
+
+export async function getUserRole(email: string): Promise<UserRole> {
+  const record = await getAdminRecord(email)
+  if (!record) return 'user'
+  return record.role
 }
 
 export async function listAdmins(): Promise<AdminRecord[]> {

@@ -12,10 +12,10 @@ async function requireAdmin(): Promise<string> {
   return user.email
 }
 
-export async function getDraftState(): Promise<boolean> {
+export async function getDraftState(): Promise<{ isActive: boolean; name: string | null }> {
   const db = createAdminClient()
-  const { data } = await db.from('draft_state').select('is_active').single()
-  return data?.is_active ?? false
+  const { data } = await db.from('draft_state').select('is_active, name').single()
+  return { isActive: data?.is_active ?? false, name: data?.name ?? null }
 }
 
 export async function getDraftSeatCount(floorId: string): Promise<number> {
@@ -27,7 +27,7 @@ export async function getDraftSeatCount(floorId: string): Promise<number> {
   return count ?? 0
 }
 
-export async function initializeDraft(floorId: string): Promise<void> {
+export async function initializeDraft(floorId: string, name: string): Promise<void> {
   await requireAdmin()
   const db = createAdminClient()
 
@@ -62,7 +62,7 @@ export async function initializeDraft(floorId: string): Promise<void> {
 
   const { error: stateError } = await db
     .from('draft_state')
-    .update({ is_active: true, started_at: new Date().toISOString() })
+    .update({ is_active: true, started_at: new Date().toISOString(), name })
     .eq('id', 1)
   if (stateError) throw new Error(stateError.message)
 }
@@ -145,7 +145,14 @@ export async function discardDraft(floorId: string): Promise<void> {
 
   const { error: stateError } = await db
     .from('draft_state')
-    .update({ is_active: false, started_at: null })
+    .update({ is_active: false, started_at: null, name: null })
     .eq('id', 1)
   if (stateError) throw new Error(stateError.message)
+}
+
+export async function renameDraft(name: string): Promise<void> {
+  await requireAdmin()
+  const db = createAdminClient()
+  const { error } = await db.from('draft_state').update({ name }).eq('id', 1)
+  if (error) throw new Error(error.message)
 }

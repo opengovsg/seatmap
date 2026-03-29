@@ -15,11 +15,20 @@ async function isDraftActive(): Promise<boolean> {
   return data?.is_active ?? false
 }
 
+type SeatSnapshot = {
+  status: string
+  occupant_name: string | null
+  occupant_team: string | null
+  occupant_division: string | null
+  notes: string | null
+  label: string
+}
+
 async function writeAudit(
   seatId: string,
   action: string,
   editorEmail: string,
-  opts?: { field?: string; oldValue?: string | null; newValue?: string | null }
+  opts?: { field?: string; oldValue?: string | null; newValue?: string | null; before?: SeatSnapshot | null }
 ) {
   const db = createAdminClient()
   const { error } = await db.from('audit_logs').insert({
@@ -29,6 +38,7 @@ async function writeAudit(
     field: opts?.field ?? null,
     old_value: opts?.oldValue ?? null,
     new_value: opts?.newValue ?? null,
+    before: opts?.before ?? null,
   })
   if (error) throw new Error('Audit log failed: ' + error.message)
 }
@@ -58,7 +68,7 @@ export async function assignSeat(
     return
   }
 
-  const { data: old } = await db.from('seats').select('occupant_name').eq('id', seatId).single()
+  const { data: old } = await db.from('seats').select('*').eq('id', seatId).single()
 
   const { error } = await db.from('seats').update({
     status: 'OCCUPIED',
@@ -73,6 +83,7 @@ export async function assignSeat(
     field: 'occupant_name',
     oldValue: old?.occupant_name ?? null,
     newValue: occupantName,
+    before: old ? { status: old.status, occupant_name: old.occupant_name, occupant_team: old.occupant_team, occupant_division: old.occupant_division, notes: old.notes, label: old.label } : null,
   })
 }
 
@@ -95,7 +106,7 @@ export async function unassignSeat(seatId: string) {
     return
   }
 
-  const { data: old } = await db.from('seats').select('occupant_name').eq('id', seatId).single()
+  const { data: old } = await db.from('seats').select('*').eq('id', seatId).single()
 
   const { error } = await db.from('seats').update({
     status: 'AVAILABLE',
@@ -108,6 +119,7 @@ export async function unassignSeat(seatId: string) {
   await writeAudit(seatId, 'UNASSIGN', email, {
     field: 'occupant_name',
     oldValue: old?.occupant_name ?? null,
+    before: old ? { status: old.status, occupant_name: old.occupant_name, occupant_team: old.occupant_team, occupant_division: old.occupant_division, notes: old.notes, label: old.label } : null,
   })
 }
 
@@ -162,7 +174,7 @@ export async function makeAvailable(seatId: string) {
     return
   }
 
-  const { data: old } = await db.from('seats').select('status').eq('id', seatId).single()
+  const { data: old } = await db.from('seats').select('*').eq('id', seatId).single()
 
   const { error } = await db.from('seats').update({
     status: 'AVAILABLE',
@@ -177,6 +189,7 @@ export async function makeAvailable(seatId: string) {
     field: 'status',
     oldValue: old?.status ?? null,
     newValue: 'AVAILABLE',
+    before: old ? { status: old.status, occupant_name: old.occupant_name, occupant_team: old.occupant_team, occupant_division: old.occupant_division, notes: old.notes, label: old.label } : null,
   })
 }
 
@@ -215,6 +228,7 @@ export async function updateSeat(
   const { error } = await db.from('seats').update(updates).eq('id', seatId)
   if (error) throw new Error(error.message)
 
+  const before = old ? { status: old.status, occupant_name: old.occupant_name, occupant_team: old.occupant_team, occupant_division: old.occupant_division, notes: old.notes, label: old.label } : null
   const fields = Object.keys(updates) as (keyof typeof updates)[]
   for (const field of fields) {
     if (old && updates[field] !== old[field]) {
@@ -222,6 +236,7 @@ export async function updateSeat(
         field,
         oldValue: old[field] ?? null,
         newValue: updates[field] ?? null,
+        before,
       })
     }
   }
@@ -252,6 +267,22 @@ export async function restoreSeat(seatId: string, snapshot: {
   const { error } = await db.from('seats').update(snapshot).eq('id', seatId)
   if (error) throw new Error(error.message)
   await writeAudit(seatId, 'UPDATE', email)
+}
+
+export async function undoAuditEntry(auditLogId: string): Promise<void> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user?.email) throw new Error('Not authenticated.')
+  const { isAdmin } = await import('@/lib/admins')
+  if (!(await isAdmin(user.email))) throw new Error('Admin access required.')
+
+  const db = createAdminClient()
+  const { data: log } = await db.from('audit_logs').select('*').eq('id', auditLogId).single()
+  if (!log) throw new Error('Audit log entry not found.')
+  if (!log.before) throw new Error('No snapshot available to undo this change.')
+
+  const snapshot = log.before as { status: string; occupant_name: string | null; occupant_team: string | null; occupant_division: string | null; notes: string | null; label: string }
+  await restoreSeat(log.seat_id, snapshot)
 }
 
 export async function moveSeat(fromSeatId: string, toSeatId: string) {

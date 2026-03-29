@@ -25,10 +25,11 @@ interface MapClientProps {
   divisions:    string[]
   userEmail:    string
   isDraft:      boolean
+  draftName:    string | null
   userIsAdmin:  boolean
 }
 
-export function MapClient({ floor, initialSeats, teams, divisions, userEmail, isDraft, userIsAdmin }: MapClientProps) {
+export function MapClient({ floor, initialSeats, teams, divisions, userEmail, isDraft, draftName, userIsAdmin }: MapClientProps) {
   const [seats,        setSeats]        = useState<Seat[]>(initialSeats)
   const [selectedSeat, setSelectedSeat] = useState<Seat | null>(null)
   const [movingFrom,   setMovingFrom]   = useState<Seat | null>(null)
@@ -168,10 +169,8 @@ export function MapClient({ floor, initialSeats, teams, divisions, userEmail, is
         <div className="bg-blue-50 border-b border-blue-200 px-4 py-2 text-sm text-blue-800 flex items-center gap-2">
           <FileEdit className="size-3.5 shrink-0" />
           <span>
-            Draft mode — edits are not live yet.
-            {userIsAdmin
-              ? <> Go to <a href="/admin" className="underline font-medium">Admin</a> to publish or discard.</>
-              : ' An admin must publish changes before they go live.'}
+            {draftName ? <>Editing draft: <strong>{draftName}</strong>. </> : 'Draft mode. '}
+            This draft was created by an admin due to multiple changes to seating.
           </span>
         </div>
       )}

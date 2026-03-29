@@ -45,26 +45,33 @@ async function writeAudit(
 
 export async function assignSeat(
   seatId: string,
-  occupantName: string,
-  occupantTeam: string,
-  occupantDivision: string,
-  notes: string
+  personId: string,
+  notes: string,
 ) {
   const db = createAdminClient()
   const email = await getEditorEmail()
 
+  // Look up person details to sync into occupant cache fields
+  const { data: person, error: personError } = await db
+    .from('people')
+    .select('name, team, division')
+    .eq('id', personId)
+    .single()
+  if (personError || !person) throw new Error('Person not found.')
+
   if (await isDraftActive()) {
     const { error } = await db.from('seat_drafts').update({
       status: 'OCCUPIED',
-      occupant_name: occupantName,
-      occupant_team: occupantTeam || null,
-      occupant_division: occupantDivision || null,
+      person_id: personId,
+      occupant_name: person.name,
+      occupant_team: person.team ?? null,
+      occupant_division: person.division ?? null,
       notes: notes || null,
       updated_by: email,
       updated_at: new Date().toISOString(),
     }).eq('seat_id', seatId)
     if (error) throw new Error(error.message)
-    await writeAudit(seatId, 'ASSIGN', email, { field: 'occupant_name', newValue: occupantName })
+    await writeAudit(seatId, 'ASSIGN', email, { field: 'occupant_name', newValue: person.name })
     return
   }
 
@@ -72,9 +79,10 @@ export async function assignSeat(
 
   const { error } = await db.from('seats').update({
     status: 'OCCUPIED',
-    occupant_name: occupantName,
-    occupant_team: occupantTeam || null,
-    occupant_division: occupantDivision || null,
+    person_id: personId,
+    occupant_name: person.name,
+    occupant_team: person.team ?? null,
+    occupant_division: person.division ?? null,
     notes: notes || null,
   }).eq('id', seatId)
   if (error) throw new Error(error.message)
@@ -82,7 +90,7 @@ export async function assignSeat(
   await writeAudit(seatId, 'ASSIGN', email, {
     field: 'occupant_name',
     oldValue: old?.occupant_name ?? null,
-    newValue: occupantName,
+    newValue: person.name,
     before: old ? { status: old.status, occupant_name: old.occupant_name, occupant_team: old.occupant_team, occupant_division: old.occupant_division, notes: old.notes, label: old.label } : null,
   })
 }
@@ -95,6 +103,7 @@ export async function unassignSeat(seatId: string) {
     const { data: old } = await db.from('seat_drafts').select('occupant_name').eq('seat_id', seatId).single()
     const { error } = await db.from('seat_drafts').update({
       status: 'AVAILABLE',
+      person_id: null,
       occupant_name: null,
       occupant_team: null,
       occupant_division: null,
@@ -110,6 +119,7 @@ export async function unassignSeat(seatId: string) {
 
   const { error } = await db.from('seats').update({
     status: 'AVAILABLE',
+    person_id: null,
     occupant_name: null,
     occupant_team: null,
     occupant_division: null,

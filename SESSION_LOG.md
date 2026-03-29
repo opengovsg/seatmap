@@ -1,3 +1,34 @@
+## 2026-03-29 — Person Entity + Unseated Panel
+
+**Changes:**
+- Created `supabase/add-people.sql` migration: `people` table with RLS, `person_id` FK added to `seats` and `seat_drafts`
+- Created `src/app/actions/people.ts`: `listPeople`, `createPerson`, `updatePerson`, `archivePerson`
+- Updated `src/app/actions/seats.ts`: `assignSeat` now accepts `personId` instead of free-text name/team/division; looks up person from DB and syncs occupant cache fields; all seat actions now capture a `before` snapshot in audit log
+- Added `Person`, `SeatSnapshot` types to `src/types/index.ts`; added `before: SeatSnapshot | null` to `AuditLog`
+- Created `src/components/UnseatedPanel.tsx`: custom slide-in panel (no Sheet component available), shows unseated and seated people, search filter, inline add person form, archive button (admin only), assign-to-seat button
+- Rewrote `src/components/SeatModal.tsx`: replaced free-text name/team/division inputs with `PersonPicker` combobox showing unseated people; supports inline person creation; reserved seat assignment shows a confirmation dialog; accepts `initialPerson` prop to pre-select when coming from the panel
+- Updated `src/components/MapClient.tsx`: added `people`/`unseatedPeople` state, `assigningPerson` state and banner, `refreshPeople` callback, `UnseatedPanel` render with `Users` icon toggle button, `initialPerson` passed to `SeatModal`
+- Updated `src/app/map/page.tsx`: fetches people via `listPeople(isDraft)` and passes as `initialPeople` prop
+
+**Decisions:**
+- No `people_draft` shadow table — unseated list in draft mode derived at query time from `seat_drafts.person_id`
+- `occupant_name/team/division` kept as cache fields on seat rows — avoids breaking audit log snapshots and existing queries
+- Custom slide-in panel instead of shadcn Sheet — `npx shadcn add sheet` unavailable (no network access in dev environment)
+- `assignSeat` signature changed from free-text to `(seatId, personId, notes)` — person details always authoritative from `people` table
+- `key={selectedSeat?.id}` on `SeatModal` used to reset state on mount, so `initialPerson` correctly pre-populates without needing `useEffect`
+
+**Current state:**
+All code complete and TypeScript-clean. SQL migration run in Supabase. Feature should be fully functional: people panel accessible from map page, person picker in seat modal, assign-from-panel flow, inline person creation, reserved seat confirmation.
+
+**Next steps:**
+- Test the full assign flow end-to-end: create person → assign via panel → verify unseated list updates
+- Test inline person creation in the seat modal
+- Test reserved seat confirmation dialog
+- Consider adding an edit person flow (name/team/division) — currently only possible by editing the occupied seat's cached fields directly
+- Consider showing unseated count as a badge on the panel toggle button
+
+---
+
 ## 2026-03-29 — Named Drafts, Audit Log Undo, and Role System Groundwork
 
 **Changes:**

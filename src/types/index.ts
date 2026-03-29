@@ -8,12 +8,24 @@ export interface Floor {
   svg_content: string
 }
 
+export interface Person {
+  id: string
+  name: string
+  team: string | null
+  division: string | null
+  is_archived: boolean
+  created_at: string
+  // Joined field — null means unseated
+  seat?: { id: string; label: string } | null
+}
+
 export interface Seat {
   id: string
   floor_id: string
   svg_rect_id: string
   label: string
   status: SeatStatus
+  person_id: string | null
   occupant_name: string | null
   occupant_team: string | null
   occupant_division: string | null

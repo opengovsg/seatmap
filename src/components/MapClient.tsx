@@ -4,11 +4,14 @@ import { useState, useCallback, useMemo } from 'react'
 import { SeatMap } from './SeatMap'
 import { SeatModal } from './SeatModal'
 import { NavBar } from './NavBar'
-import type { Seat, Floor, SeatStatus } from '@/types'
+import { UnseatedPanel } from './UnseatedPanel'
+import type { Seat, Floor, SeatStatus, Person } from '@/types'
 import { moveSeat, restoreSeat } from '@/app/actions/seats'
+import { listPeople } from '@/app/actions/people'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { FileEdit } from 'lucide-react'
+import { FileEdit, Users } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 function toastTimestamp() {
   return new Date().toLocaleString('en-US', {
@@ -19,21 +22,25 @@ function toastTimestamp() {
 
 
 interface MapClientProps {
-  floor:        Floor
-  initialSeats: Seat[]
-  teams:        string[]
-  divisions:    string[]
-  userEmail:    string
-  isDraft:      boolean
-  draftName:    string | null
-  userIsAdmin:  boolean
+  floor:          Floor
+  initialSeats:   Seat[]
+  initialPeople:  Person[]
+  teams:          string[]
+  divisions:      string[]
+  userEmail:      string
+  isDraft:        boolean
+  draftName:      string | null
+  userIsAdmin:    boolean
 }
 
-export function MapClient({ floor, initialSeats, teams, divisions, userEmail, isDraft, draftName, userIsAdmin }: MapClientProps) {
-  const [seats,        setSeats]        = useState<Seat[]>(initialSeats)
-  const [selectedSeat, setSelectedSeat] = useState<Seat | null>(null)
-  const [movingFrom,   setMovingFrom]   = useState<Seat | null>(null)
-  const [moveError,    setMoveError]    = useState<string | null>(null)
+export function MapClient({ floor, initialSeats, initialPeople, teams, divisions, userEmail, isDraft, draftName, userIsAdmin }: MapClientProps) {
+  const [seats,           setSeats]           = useState<Seat[]>(initialSeats)
+  const [people,          setPeople]          = useState<Person[]>(initialPeople)
+  const [selectedSeat,    setSelectedSeat]    = useState<Seat | null>(null)
+  const [movingFrom,      setMovingFrom]      = useState<Seat | null>(null)
+  const [moveError,       setMoveError]       = useState<string | null>(null)
+  const [panelOpen,       setPanelOpen]       = useState(false)
+  const [assigningPerson, setAssigningPerson] = useState<Person | null>(null)
 
   // ── Filter state ────────────────────────────────────────────────────────────
   const [searchQuery,     setSearchQuery]     = useState('')
@@ -68,6 +75,11 @@ export function MapClient({ floor, initialSeats, teams, divisions, userEmail, is
         .map((s) => s.id)
     )
   }, [seats, searchQuery, statusFilter, teamFilter, divisionFilter])
+
+  const refreshPeople = useCallback(async () => {
+    const updated = await listPeople(isDraft)
+    setPeople(updated)
+  }, [isDraft])
 
   // ── Seat interactions ────────────────────────────────────────────────────────
   const refreshSeats = useCallback(async () => {
@@ -104,6 +116,16 @@ export function MapClient({ floor, initialSeats, teams, divisions, userEmail, is
   }, [isDraft, floor.id])
 
   const handleSeatClick = useCallback((seat: Seat) => {
+    if (assigningPerson) {
+      if (seat.status === 'OCCUPIED') {
+        const ok = window.confirm(`${seat.label} is already occupied by ${seat.occupant_name}.\n\nReplace with ${assigningPerson.name}?`)
+        if (!ok) return
+      }
+      setSelectedSeat(seat)
+      setAssigningPerson(null)
+      return
+    }
+
     if (movingFrom) {
       if (seat.id === movingFrom.id) { setMovingFrom(null); return }
 
@@ -141,12 +163,25 @@ export function MapClient({ floor, initialSeats, teams, divisions, userEmail, is
     }
 
     setSelectedSeat(seat)
-  }, [movingFrom, refreshSeats])
+  }, [assigningPerson, movingFrom, refreshSeats])
 
   const handleMoveStart = useCallback((seat: Seat) => {
     setMoveError(null)
     setMovingFrom(seat)
   }, [])
+
+  const handlePersonAssign = useCallback((person: Person) => {
+    setAssigningPerson(person)
+  }, [])
+
+  const handleRefreshPeople = useCallback(async () => {
+    await refreshPeople()
+  }, [refreshPeople])
+
+  const unseatedPeople = useMemo(
+    () => people.filter(p => !p.seat),
+    [people]
+  )
 
   return (
     <>
@@ -185,6 +220,15 @@ export function MapClient({ floor, initialSeats, teams, divisions, userEmail, is
         </div>
       )}
 
+      {assigningPerson && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-sm text-amber-800 flex items-center justify-between">
+          <span>
+            Assigning <strong>{assigningPerson.name}</strong>. Click a seat to assign, or{' '}
+            <button className="underline font-medium" onClick={() => setAssigningPerson(null)}>cancel</button>.
+          </span>
+        </div>
+      )}
+
       {moveError && (
         <div className="bg-destructive/10 border-b border-destructive/20 px-4 py-2 text-sm text-destructive">
           Move failed: {moveError}
@@ -192,7 +236,18 @@ export function MapClient({ floor, initialSeats, teams, divisions, userEmail, is
         </div>
       )}
 
-      <main className="flex-1 overflow-auto bg-muted/30">
+      <main className="relative flex-1 overflow-auto bg-muted/30">
+        {/* People panel toggle button */}
+        <Button
+          size="icon-sm"
+          variant="secondary"
+          className="absolute top-3 left-3 z-20 shadow-sm"
+          onClick={() => setPanelOpen(v => !v)}
+          title="People"
+        >
+          <Users className="size-4" />
+        </Button>
+
         <SeatMap
           svgContent={floor.svg_content}
           seats={seats}
@@ -202,13 +257,30 @@ export function MapClient({ floor, initialSeats, teams, divisions, userEmail, is
         />
       </main>
 
+      <UnseatedPanel
+        open={panelOpen}
+        onClose={() => setPanelOpen(false)}
+        people={people}
+        userIsAdmin={userIsAdmin}
+        onPersonAssign={handlePersonAssign}
+        onRefresh={handleRefreshPeople}
+      />
+
       <SeatModal
         key={selectedSeat?.id}
         seat={selectedSeat}
         teams={teams}
         divisions={divisions}
-        onClose={() => setSelectedSeat(null)}
-        onUpdated={refreshSeats}
+        unseatedPeople={unseatedPeople}
+        initialPerson={assigningPerson}
+        onClose={() => {
+          setSelectedSeat(null)
+          setAssigningPerson(null)
+        }}
+        onUpdated={async () => {
+          await refreshSeats()
+          await refreshPeople()
+        }}
         onMoveStart={handleMoveStart}
       />
     </>

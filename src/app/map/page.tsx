@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { MapClient } from '@/components/MapClient'
 import { getDraftState } from '@/app/actions/draft'
 import { isAdmin } from '@/lib/admins'
+import { listPeople } from '@/app/actions/people'
 import type { Seat } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -21,7 +22,7 @@ export default async function MapPage() {
     getDraftState(),
     isAdmin(user.email ?? ''),
   ])
-  const isDraft = draftState.isActive
+  const isDraft   = draftState.isActive
   const draftName = draftState.name
 
   if (!floor) {
@@ -73,11 +74,14 @@ export default async function MapPage() {
   const teams     = [...new Set((teamRows     ?? []).map((r) => r.occupant_team     as string))].sort()
   const divisions = [...new Set((divisionRows ?? []).map((r) => r.occupant_division as string))].sort()
 
+  const people = await listPeople(isDraft)
+
   return (
     <div className="flex flex-col h-full">
       <MapClient
         floor={floor}
         initialSeats={normalizedSeats as Seat[]}
+        initialPeople={people}
         teams={teams}
         divisions={divisions}
         userEmail={user.email ?? ''}

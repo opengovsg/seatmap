@@ -1,3 +1,43 @@
+## 2026-03-29 — Named Drafts, Audit Log Undo, and Role System Groundwork
+
+**Changes:**
+- Added `name` column to `draft_state` table (`supabase/add-draft-name.sql`)
+- `initializeDraft` now accepts a name; `getDraftState` returns `{ isActive, name }`
+- Added `renameDraft()` server action
+- Draft banner updated to fixed copy: "Editing draft: [Name]. This draft was created by an admin due to multiple changes to seating."
+- Built `StartDraftModal` component — prompts for name when starting or renaming a draft
+- Added `before` JSONB column to `audit_logs` to store full pre-change seat snapshot (`supabase/add-audit-before-snapshot.sql`)
+- Added `undoAuditEntry()` server action; each seat action now captures `before` snapshot
+- Audit log in Admin Panel now shows Undo buttons for undoable actions (admin only)
+- Standalone `/audit` page rebuilt with TanStack DataTable — matches admin panel, no undo button
+- Added `getUserRole()` helper returning `'owner' | 'admin' | 'user'`
+- Renamed "Admin" to "Admin Panel" in navbar and page header
+
+**Decisions:**
+- **No mode toggle** — when a draft is active, everyone automatically sees draft mode. No switching.
+- **Live edits blocked by draft** — if a draft is started, all edits go to the draft. Once published, no live edits are lost.
+- **One active draft only** — multiple concurrent drafts ruled out. Drafts can be named for clarity.
+- **Fixed banner copy** — "due to multiple changes to seating" chosen over clinical wording to explain draft mode without alarming users.
+- **No `editor` role** — the existing `'owner'` / `'admin'` binary already covers the needed permissions. `getUserRole()` adds `'user'` as the third case for non-admins. The earlier "editor" role concept was merged into the "any user can edit" model.
+- **Standalone audit log for all users** — `/audit` serves all users; Admin Panel retains the undo capability exclusively.
+- **`before` snapshot in audit log** — storing JSONB snapshot on each audit entry enables durable undo from the log, not just from a toast notification.
+
+**Current state:**
+All code committed to `drafts` branch (commit `159cc67`). Three SQL migrations need to be applied to Supabase before new features work:
+1. `supabase/add-draft-name.sql`
+2. `supabase/add-audit-before-snapshot.sql`
+3. `supabase/update-publish-clears-draft-name.sql`
+
+**Next steps:**
+- Apply the three migrations to the Supabase database
+- Test the full draft flow: start draft (modal) → edit seats → publish/discard → verify banner and audit log
+- Test admin undo from the audit log
+- Verify the standalone `/audit` page renders correctly for non-admin users
+- Consider: audit log link visible to all users in the navbar
+- Consider: viewer role enforcement (blocking unauthenticated / read-only access) if needed
+
+---
+
 ## 2026-03-29 — Roles, permissions, and draft design discussion
 
 **Changes:**

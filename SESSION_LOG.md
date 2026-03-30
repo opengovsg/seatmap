@@ -1,3 +1,50 @@
+## 2026-03-30 — Postman OTP Authentication
+
+**Changes:**
+- Replaced Supabase magic link authentication with Postman OTP (one-time password) email delivery
+- Created `supabase/add-otp-codes.sql`: database schema for OTP storage with rate limiting and attempt tracking
+- Created `src/lib/postman.ts`: Postman API integration with secure 6-digit code generation and HTML email templates
+- Created `src/app/api/auth/request-otp/route.ts`: API endpoint to request OTP (validates domain, checks rate limit, stores code, sends email)
+- Created `src/app/api/auth/verify-otp/route.ts`: API endpoint to verify OTP (checks expiry, validates code, creates Supabase session)
+- Rewrote `src/app/login/page.tsx`: replaced "check email" flow with OTP input card featuring 6-digit numeric input, auto-submit at 6 digits, resend with 60-second countdown timer
+- Updated `README.md`: changed authentication description to OTP, added Postman environment variables, added step 11 to database setup
+- Renamed `src/app/auth/callback/route.ts` to `callback-legacy-backup.ts`: preserved old magic link handler for potential rollback
+- Created `OTP_IMPLEMENTATION.md`: comprehensive documentation with architecture, testing checklist, and troubleshooting guide
+
+**Decisions:**
+- **OTP instead of magic links** — resolves user feedback about email delivery issues and "need Supabase account" confusion
+- **Keep Supabase for database/sessions** — only changed email delivery, not the underlying auth system
+- **15-minute expiry + 5 attempt limit** — balances security with usability
+- **60-second rate limit per email** — prevents abuse while allowing legitimate resends
+- **Auto-submit at 6 digits** — streamlines mobile UX, reduces friction
+- **Rollback-safe implementation** — old callback route preserved, database changes non-destructive, `otp_codes` table isolated
+- **Secure code generation** — uses Node.js `crypto.randomBytes()` for cryptographically secure random codes
+- **Transaction-like behavior** — if Postman email fails, OTP database record is rolled back
+
+**Current state:**
+All code complete and TypeScript-clean. Changes on `postman` branch. Implementation ready to test but requires:
+1. `POSTMAN_API_KEY` and `POSTMAN_FROM_EMAIL` in `.env.local`
+2. Running `supabase/add-otp-codes.sql` in Supabase SQL editor
+
+**Next steps:**
+- **Add environment variables** to `.env.local`:
+  ```
+  POSTMAN_API_KEY=your-postman-api-key
+  POSTMAN_FROM_EMAIL=seatmap@open.gov.sg
+  ```
+- **Run database migration** in Supabase SQL editor: `supabase/add-otp-codes.sql`
+- **Test locally** at http://localhost:3000/login:
+  - Enter @open.gov.sg email → receive 6-digit code
+  - Verify auto-submit works when 6 digits entered
+  - Test resend countdown timer (60 seconds)
+  - Test error cases: wrong code, expired code, rate limit
+  - Verify session persists after login
+- **Test email delivery**: verify codes arrive within 30 seconds, HTML renders correctly, check spam folder if needed
+- **Verify security features**: rate limiting, attempt counting, single-use codes, domain validation
+- **Consider cleanup**: add scheduled task to delete expired OTP codes (currently accumulate in database)
+
+---
+
 ## 2026-03-29 — People Panel & Navbar Polish
 
 **Changes:**

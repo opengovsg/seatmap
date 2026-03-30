@@ -28,6 +28,8 @@ Create a `.env.local` file in the project root with the following variables. You
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+POSTMAN_API_KEY=your-postman-api-key
+POSTMAN_FROM_EMAIL=seatmap@open.gov.sg
 ```
 
 ## Database setup
@@ -44,6 +46,7 @@ Run the following SQL files in order in the Supabase SQL editor:
 8. `supabase/add-draft-started-at.sql`
 9. `supabase/update-publish-clears-draft-name.sql`
 10. `supabase/add-people.sql` — people/roster management
+11. `supabase/add-otp-codes.sql` — OTP authentication
 
 Then seed the database with your floor plan:
 
@@ -53,9 +56,9 @@ npm run seed
 
 ## Authentication
 
-Login uses Supabase magic links (passwordless). Users enter their email, receive a link, and are authenticated on click — no password required.
+Login uses OTP codes sent via Postman email API. Users enter their email, receive a 6-digit code, and authenticate by entering it — no password required.
 
-By default, only `@open.gov.sg` email addresses are allowed. To change the allowed domain, update the `isAllowedEmail` function in `src/app/login/page.tsx`.
+By default, only `@open.gov.sg` email addresses are allowed. To change the allowed domain, update the `isAllowedEmail` function in both `src/app/login/page.tsx` and `src/app/api/auth/request-otp/route.ts`.
 
 ## Admin access
 

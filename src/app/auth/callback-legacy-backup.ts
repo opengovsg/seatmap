@@ -1,3 +1,11 @@
+/**
+ * LEGACY BACKUP FILE
+ *
+ * This was the old Supabase magic link auth callback handler.
+ * Kept as backup reference in case we need to rollback from OTP auth.
+ * This file is NOT active - it's been renamed to prevent Next.js from routing to it.
+ */
+
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 

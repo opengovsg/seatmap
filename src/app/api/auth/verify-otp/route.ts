@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { createClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
 
 const MAX_ATTEMPTS = 5
 
@@ -85,27 +86,40 @@ export async function POST(request: Request) {
       .update({ verified: true })
       .eq('id', otpRecord.id)
 
-    // Create or get user in Supabase auth
-    const { data: userData, error: userError } = await db.auth.admin.createUser({
-      email,
-      email_confirm: true,
-    })
+    // Get existing user or create new one
+    let userId: string
 
-    if (userError) {
-      console.error('Failed to create user:', userError)
-      return NextResponse.json(
-        { error: 'Failed to create session' },
-        { status: 500 }
-      )
+    // Try to get existing user first
+    const { data: existingUsers } = await db.auth.admin.listUsers()
+    const existingUser = existingUsers?.users.find(u => u.email === email)
+
+    if (existingUser) {
+      userId = existingUser.id
+    } else {
+      // Create new user if doesn't exist
+      const { data: userData, error: userError } = await db.auth.admin.createUser({
+        email,
+        email_confirm: true,
+      })
+
+      if (userError) {
+        console.error('Failed to create user:', userError)
+        return NextResponse.json(
+          { error: 'Failed to create session' },
+          { status: 500 }
+        )
+      }
+
+      userId = userData.user.id
     }
 
-    // Generate session tokens
+    // Generate a session link (like magic link does)
     const { data: linkData, error: linkError } = await db.auth.admin.generateLink({
       type: 'magiclink',
       email,
     })
 
-    if (linkError || !linkData?.properties) {
+    if (linkError || !linkData?.properties?.hashed_token) {
       console.error('Failed to generate session:', linkError)
       return NextResponse.json(
         { error: 'Failed to create session' },
@@ -113,22 +127,11 @@ export async function POST(request: Request) {
       )
     }
 
-    // Set session on server client (this sets cookies)
-    const supabase = await createClient()
-    const { error: sessionError } = await supabase.auth.setSession({
-      access_token: linkData.properties.access_token,
-      refresh_token: linkData.properties.refresh_token,
+    // Return the hashed token - client will use it to exchange for session
+    return NextResponse.json({
+      success: true,
+      token: linkData.properties.hashed_token,
     })
-
-    if (sessionError) {
-      console.error('Failed to set session:', sessionError)
-      return NextResponse.json(
-        { error: 'Failed to set session' },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Verify OTP error:', error)
     return NextResponse.json(

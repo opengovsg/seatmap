@@ -107,8 +107,8 @@ function LoginPageInner() {
         return
       }
 
-      // Success - redirect to map
-      window.location.href = '/map'
+      // Redirect to auth callback with the token (like magic link flow)
+      window.location.href = `/auth/callback?token_hash=${data.token}&type=magiclink`
     } catch (err) {
       setError('An unexpected error occurred')
       setVerifying(false)

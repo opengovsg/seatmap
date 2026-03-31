@@ -29,6 +29,7 @@ export async function proxy(request: NextRequest) {
   const isAuthRoute =
     request.nextUrl.pathname.startsWith('/login') ||
     request.nextUrl.pathname.startsWith('/auth') ||
+    request.nextUrl.pathname.startsWith('/api/auth') ||
     // Allow root with ?code= so the Supabase magic link can exchange its code
     (request.nextUrl.pathname === '/' && request.nextUrl.searchParams.has('code'))
 

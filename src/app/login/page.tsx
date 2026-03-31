@@ -208,7 +208,7 @@ function LoginCard({
                 onChange={(e) => onEmail(e.target.value)}
                 required
                 autoFocus
-                size="lg"
+                className="h-12 text-lg"
               />
               {error && <FieldError>{error}</FieldError>}
             </Field>
@@ -281,8 +281,7 @@ function EnterOtpCard({
                 required
                 autoFocus
                 autoComplete="one-time-code"
-                size="lg"
-                className="text-center text-3xl tracking-widest font-mono"
+                className="text-center text-3xl tracking-widest font-mono h-16"
               />
               {error && <FieldError>{error}</FieldError>}
             </Field>

@@ -208,11 +208,12 @@ function LoginCard({
                 onChange={(e) => onEmail(e.target.value)}
                 required
                 autoFocus
+                size="lg"
               />
               {error && <FieldError>{error}</FieldError>}
             </Field>
             <Field>
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button type="submit" size="lg" className="w-full" disabled={loading}>
                 {loading ? 'Sending…' : 'Send login code'}
               </Button>
             </Field>
@@ -280,12 +281,13 @@ function EnterOtpCard({
                 required
                 autoFocus
                 autoComplete="one-time-code"
-                className="text-center text-2xl tracking-widest font-mono"
+                size="lg"
+                className="text-center text-3xl tracking-widest font-mono"
               />
               {error && <FieldError>{error}</FieldError>}
             </Field>
             <Field>
-              <Button type="submit" className="w-full" disabled={verifying || otp.length !== 6}>
+              <Button type="submit" size="lg" className="w-full" disabled={verifying || otp.length !== 6}>
                 {verifying ? 'Verifying…' : 'Verify Code'}
               </Button>
             </Field>

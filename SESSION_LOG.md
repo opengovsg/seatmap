@@ -1,3 +1,41 @@
+## 2026-03-31 — OTP Authentication Debugging & UI Polish
+
+**Changes:**
+- Fixed middleware blocking `/api/auth/*` routes: added `/api/auth` to allowed unauthenticated routes in `src/proxy.ts`
+- Resolved OTP session creation issues: changed verify-otp endpoint to return hashed token instead of trying to set session in API route (which fails with AuthSessionMissingError)
+- Restored `src/app/auth/callback/route.ts` to handle token exchange via `verifyOtp()` method
+- Updated login flow to redirect to `/auth/callback?token_hash=...` after OTP verification (matches Supabase magic link pattern)
+- Fixed existing user handling: verify-otp now checks for existing users before creating new ones
+- Configured Postman sender email to use default `info@mail.postman.gov.sg` (custom sender requires 2-week setup)
+- Simplified OTP email to plain text with `<br>` tags for line breaks
+- Updated email subject line to lowercase: "Your seatmap verification code"
+- Improved login UI sizing: all inputs and buttons use `size="lg"` for better touch targets
+- OTP input field: larger text (`text-3xl`) with centered, monospace styling for easy reading
+
+**Decisions:**
+- **Token exchange pattern** — API returns hashed token, callback route handles session creation. This matches Supabase's established pattern and properly persists cookies server-side
+- **Default Postman sender** — Use `info@mail.postman.gov.sg` instead of custom sender to avoid 2-week onboarding delay
+- **Plain text email with HTML breaks** — Use `<br>` tags in plain text for line breaks (email clients strip single `\n` characters)
+- **Consistent large sizing** — All form elements use `size="lg"` instead of custom heights for design consistency
+
+**Current state:**
+OTP authentication fully working end-to-end on `postman` branch. Users can:
+- Enter email → receive OTP via Postman
+- Enter 6-digit code → auto-submit on completion
+- Successfully log in and access /map
+- Resend codes with 60-second countdown
+
+All commits pushed to remote. Ready for testing in production environment.
+
+**Next steps:**
+- Test OTP flow on different email clients (Gmail, Outlook, Apple Mail) to verify formatting
+- Consider adding OTP cleanup job to delete expired codes from database (currently accumulate)
+- Monitor Postman API usage and email delivery success rates
+- Update documentation if Postman sender email changes in future
+- Consider merging `postman` branch to `main` after production testing
+
+---
+
 ## 2026-03-30 — Postman OTP Authentication
 
 **Changes:**

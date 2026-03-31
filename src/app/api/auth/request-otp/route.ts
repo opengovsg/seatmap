@@ -75,7 +75,7 @@ export async function POST(request: Request) {
       const emailHtml = getOtpEmailHtml(code, OTP_EXPIRY_MINUTES)
       await sendEmail(
         email,
-        'Your SeatMap verification code',
+        'Your seatmap verification code',
         emailHtml
       )
     } catch (emailError) {

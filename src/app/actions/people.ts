@@ -55,13 +55,19 @@ export async function createPerson(
   name: string,
   team: string,
   division: string,
+  jobTitle: string,
 ): Promise<Person> {
   await requireAuth()
   const db = createAdminClient()
 
   const { data, error } = await db
     .from('people')
-    .insert({ name: name.trim(), team: team.trim() || null, division: division.trim() || null })
+    .insert({
+      name: name.trim(),
+      team: team.trim() || null,
+      division: division.trim() || null,
+      job_title: jobTitle.trim() || null,
+    })
     .select()
     .single()
 
@@ -71,15 +77,16 @@ export async function createPerson(
 
 export async function updatePerson(
   personId: string,
-  updates: { name?: string; team?: string | null; division?: string | null },
+  updates: { name?: string; team?: string | null; division?: string | null; job_title?: string | null },
 ): Promise<void> {
   await requireAuth()
   const db = createAdminClient()
 
   const cleaned = {
-    ...(updates.name !== undefined    ? { name: updates.name.trim() }                    : {}),
-    ...(updates.team !== undefined    ? { team: updates.team?.trim() || null }            : {}),
-    ...(updates.division !== undefined ? { division: updates.division?.trim() || null }   : {}),
+    ...(updates.name !== undefined      ? { name: updates.name.trim() }                      : {}),
+    ...(updates.team !== undefined      ? { team: updates.team?.trim() || null }              : {}),
+    ...(updates.division !== undefined  ? { division: updates.division?.trim() || null }      : {}),
+    ...(updates.job_title !== undefined ? { job_title: updates.job_title?.trim() || null }   : {}),
   }
 
   const { error } = await db.from('people').update(cleaned).eq('id', personId)
@@ -101,6 +108,11 @@ export async function updatePerson(
 
 export async function archivePerson(personId: string): Promise<void> {
   await requireAuth()
+
+  // Unassign the person from their seat first (if they have one)
+  await unassignSeatByPersonId(personId)
+
+  // Then archive the person
   const db = createAdminClient()
   const { error } = await db.from('people').update({ is_archived: true }).eq('id', personId)
   if (error) throw new Error(error.message)

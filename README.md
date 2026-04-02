@@ -47,6 +47,7 @@ Run the following SQL files in order in the Supabase SQL editor:
 9. `supabase/update-publish-clears-draft-name.sql`
 10. `supabase/add-people.sql` — people/roster management
 11. `supabase/add-otp-codes.sql` — OTP authentication
+12. `supabase/add-job-title.sql` — add job title field to people
 
 Then seed the database with your floor plan:
 
@@ -112,6 +113,40 @@ npm run restore-snapshot <snapshot-id>
 
 Restoring rolls back both the SVG and all seat data (assignments, reservations, notes) to exactly the state they were in when the snapshot was taken.
 
+## Importing People from CSV
+
+To bulk import employees from a CSV file:
+
+1. Prepare a CSV with these columns (exact header names required):
+   - `Name` (required)
+   - `Job Title` (optional)
+   - `Team` (optional)
+   - `Division` (optional)
+
+2. Make sure the database migration is run (step 12 in Database Setup above):
+   ```bash
+   # In Supabase SQL editor, run: supabase/add-job-title.sql
+   ```
+
+3. Run the import script:
+   ```bash
+   npm run import-people path/to/employees.csv
+   ```
+
+**Import behavior:**
+- Skips people who already exist (matched by name, case-insensitive)
+- All imported people start as **unseated** (no seat assignment)
+- Empty cells treated as null
+- Imports in batches of 100 for reliability
+- Shows summary of imported/skipped/failed rows
+
+**Example CSV format:**
+```
+Name,Job Title,Team,Division
+Alice Johnson,Senior Engineer,Engineering,Technology
+Bob Smith,Product Manager,Product,Business
+```
+
 ## Scripts
 
 | Command | Description |
@@ -121,3 +156,4 @@ Restoring rolls back both the SVG and all seat data (assignments, reservations, 
 | `npm run update-floor` | Safely update the floor plan SVG without losing seat data |
 | `npm run list-snapshots` | List all saved floor plan snapshots |
 | `npm run restore-snapshot <id>` | Roll back to a previous snapshot |
+| `npm run import-people <csv-path>` | Bulk import employees from CSV file |

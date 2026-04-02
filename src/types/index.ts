@@ -13,6 +13,7 @@ export interface Person {
   name: string
   team: string | null
   division: string | null
+  job_title: string | null
   is_archived: boolean
   created_at: string
   // Joined field — null means unseated

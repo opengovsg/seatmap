@@ -219,6 +219,11 @@ function PersonRow({ person, userIsAdmin, onEdit, onAssign, onUnassign, onArchiv
         <p className={`text-sm font-medium truncate ${person.is_archived ? 'text-muted-foreground' : ''}`}>
           {person.name}
         </p>
+        {person.job_title && (
+          <p className="text-xs text-muted-foreground truncate">
+            {person.job_title}
+          </p>
+        )}
         {(person.team || person.division) && (
           <p className="text-xs text-muted-foreground truncate">
             {[person.team, person.division].filter(Boolean).join(' · ')}

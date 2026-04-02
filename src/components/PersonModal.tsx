@@ -58,19 +58,23 @@ interface PersonModalProps {
 export function PersonModal({ open, onClose, person, onSaved, initialName, teams, divisions }: PersonModalProps) {
   const isEdit = !!person
 
-  const [name,     setName]     = useState(person?.name     ?? initialName ?? '')
-  const [team,     setTeam]     = useState(person?.team     ?? '')
-  const [division, setDivision] = useState(person?.division ?? '')
+  const [name,     setName]     = useState(person?.name      ?? initialName ?? '')
+  const [team,     setTeam]     = useState(person?.team      ?? '')
+  const [division, setDivision] = useState(person?.division  ?? '')
+  const [jobTitle, setJobTitle] = useState(person?.job_title ?? '')
   const [error,    setError]    = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   // Sync prefilled name each time the modal opens (useState ignores prop changes after mount)
   useEffect(() => {
-    if (open && !isEdit) setName(initialName ?? '')
+    if (open && !isEdit) {
+      setName(initialName ?? '')
+      setJobTitle('')
+    }
   }, [open])
 
   function handleClose() {
-    setName(''); setTeam(''); setDivision(''); setError(null)
+    setName(''); setTeam(''); setDivision(''); setJobTitle(''); setError(null)
     onClose()
   }
 
@@ -85,11 +89,18 @@ export function PersonModal({ open, onClose, person, onSaved, initialName, teams
             name: name.trim(),
             team: team.trim() || null,
             division: division.trim() || null,
+            job_title: jobTitle.trim() || null,
           })
-          onSaved({ ...person, name: name.trim(), team: team.trim() || null, division: division.trim() || null })
+          onSaved({
+            ...person,
+            name: name.trim(),
+            team: team.trim() || null,
+            division: division.trim() || null,
+            job_title: jobTitle.trim() || null,
+          })
         } else {
-          const created = await createPerson(name.trim(), team.trim(), division.trim())
-          setName(''); setTeam(''); setDivision('')
+          const created = await createPerson(name.trim(), team.trim(), division.trim(), jobTitle.trim())
+          setName(''); setTeam(''); setDivision(''); setJobTitle('')
           onSaved(created)
         }
       } catch (err) {
@@ -114,6 +125,15 @@ export function PersonModal({ open, onClose, person, onSaved, initialName, teams
                 onChange={e => setName(e.target.value)}
                 placeholder="Full name"
                 autoFocus
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="pm-job-title">Job Title</FieldLabel>
+              <Input
+                id="pm-job-title"
+                value={jobTitle}
+                onChange={e => setJobTitle(e.target.value)}
+                placeholder="e.g., Senior Engineer"
               />
             </Field>
             <Field>

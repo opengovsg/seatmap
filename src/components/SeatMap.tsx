@@ -37,8 +37,13 @@ interface SeatMapProps {
 
 export function SeatMap({ svgContent, seats, onSeatClick, moveSourceId, activeIds }: SeatMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const mapContainerRef = useRef<HTMLDivElement>(null)
   const [sanitizedSvg, setSanitizedSvg] = useState('')
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
+  const [isPanning, setIsPanning] = useState(false)
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 })
+  const [scrollStart, setScrollStart] = useState({ left: 0, top: 0 })
+  const [isOverSeat, setIsOverSeat] = useState(false)
 
   // Sanitize SVG on mount (client-only)
   useEffect(() => {
@@ -64,6 +69,8 @@ export function SeatMap({ svgContent, seats, onSeatClick, moveSourceId, activeId
         const h = svgEl.getAttribute('height') || '800'
         svgEl.setAttribute('viewBox', `0 0 ${w} ${h}`)
       }
+      // Allow pointer events through SVG background
+      svgEl.style.pointerEvents = 'none'
     }
 
     const seatMap = new Map(seats.map((s) => [s.svg_rect_id, s]))
@@ -83,10 +90,18 @@ export function SeatMap({ svgContent, seats, onSeatClick, moveSourceId, activeId
       rect.setAttribute('fill', colour)
       rect.style.opacity = isActive ? '1' : '0.4'
       rect.style.cursor = 'pointer'
+      // Re-enable pointer events for seat rects
+      rect.style.pointerEvents = 'auto'
 
-      const onOver  = (e: MouseEvent) => setTooltip({ seat, x: e.clientX, y: e.clientY })
+      const onOver  = (e: MouseEvent) => {
+        setTooltip({ seat, x: e.clientX, y: e.clientY })
+        setIsOverSeat(true)
+      }
       const onMove  = (e: MouseEvent) => setTooltip((t) => t ? { ...t, x: e.clientX, y: e.clientY } : null)
-      const onOut   = () => setTooltip(null)
+      const onOut   = () => {
+        setTooltip(null)
+        setIsOverSeat(false)
+      }
       const onClick = () => onSeatClick?.(seat)
 
       rect.addEventListener('mouseover', onOver)
@@ -105,6 +120,43 @@ export function SeatMap({ svgContent, seats, onSeatClick, moveSourceId, activeId
     return () => cleanups.forEach((fn) => fn())
   }, [sanitizedSvg, seats, onSeatClick, moveSourceId, activeIds])
 
+  // Pan functionality - use global events to handle panning outside the container
+  useEffect(() => {
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      if (!isPanning || !mapContainerRef.current) return
+      const dx = e.clientX - panStart.x
+      const dy = e.clientY - panStart.y
+      mapContainerRef.current.scrollLeft = scrollStart.left - dx
+      mapContainerRef.current.scrollTop = scrollStart.top - dy
+    }
+
+    const handleGlobalMouseUp = () => {
+      setIsPanning(false)
+    }
+
+    if (isPanning) {
+      window.addEventListener('mousemove', handleGlobalMouseMove)
+      window.addEventListener('mouseup', handleGlobalMouseUp)
+      return () => {
+        window.removeEventListener('mousemove', handleGlobalMouseMove)
+        window.removeEventListener('mouseup', handleGlobalMouseUp)
+      }
+    }
+  }, [isPanning, panStart, scrollStart])
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (isOverSeat || e.button !== 0) return // Only left click, and not on seats
+    e.preventDefault()
+    setIsPanning(true)
+    setPanStart({ x: e.clientX, y: e.clientY })
+    if (mapContainerRef.current) {
+      setScrollStart({
+        left: mapContainerRef.current.scrollLeft,
+        top: mapContainerRef.current.scrollTop,
+      })
+    }
+  }
+
   if (!sanitizedSvg) {
     return (
       <div className="flex items-center justify-center h-64 text-muted-foreground text-sm">
@@ -113,8 +165,15 @@ export function SeatMap({ svgContent, seats, onSeatClick, moveSourceId, activeId
     )
   }
 
+  const cursorClass = isPanning ? 'cursor-grabbing' : isOverSeat ? 'cursor-pointer' : 'cursor-grab'
+
   return (
-    <div className="relative p-4">
+    <div
+      ref={mapContainerRef}
+      className={`relative p-4 overflow-auto h-full ${cursorClass}`}
+      onMouseDown={handleMouseDown}
+      style={{ userSelect: isPanning ? 'none' : 'auto' }}
+    >
       <SvgContainer html={sanitizedSvg} divRef={containerRef} />
       {tooltip && <SeatTooltip seat={tooltip.seat} x={tooltip.x} y={tooltip.y} />}
     </div>

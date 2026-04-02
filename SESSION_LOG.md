@@ -1,3 +1,44 @@
+## 2026-04-02 — CSV Import, Archive Fix, Map Navigation
+
+**Changes:**
+- Added CSV bulk import functionality for employee data:
+  - Created `supabase/add-job-title.sql` migration to add `job_title` column to `people` table
+  - Built `scripts/import-people.ts` with batch processing (100 rows/batch), duplicate detection (case-insensitive), and Postman CSV parsing
+  - Added `job_title` field to TypeScript `Person` interface and all related UI components
+  - Updated `PersonModal` to include job title input field
+  - Modified `UnseatedPanel` to display job titles under person names
+  - Successfully imported 222 employees from `People.csv` (skipped 10 existing)
+  - Added `import-people` npm script and updated README with import instructions
+- Fixed archived person bug:
+  - Updated `archivePerson()` to automatically unassign people from seats before archiving
+  - Created `supabase/unassign-archived-people.sql` to clean up existing archived people still holding seats
+- Improved map navigation UX:
+  - Made navigation bar sticky (`sticky top-0 z-10`) - stays visible when scrolling
+  - Added click-and-drag panning functionality to the map
+  - Implemented cursor states: grab hand (empty space), pointer (seats), grabbing hand (while panning)
+  - Fixed layout hierarchy: added `overflow-hidden` to body and main elements so scrollbar only appears on map container
+  - Set SVG background to `pointer-events: none` while keeping seat rectangles interactive
+  - Added global mouse event listeners for smooth panning across entire window
+
+**Decisions:**
+- **Import strategy**: Skip duplicates rather than update - safer for bulk import, prevents accidental overwrites of existing data
+- **Job title storage**: Added as nullable column - allows gradual population without breaking existing records
+- **Pan implementation**: Used CSS `pointer-events` to allow mouse events through SVG background while seats remain clickable
+- **Layout fix**: Body and main use `overflow-hidden`, only SeatMap scrolls - ensures navbar stays sticky and scrollbar appears in correct location
+
+**Current state:**
+All features implemented and tested. CSV import working with 222 employees loaded. Archive bug fixed with cleanup script ready. Map navigation fully functional with sticky navbar and smooth panning. All changes committed to main branch.
+
+**Next steps:**
+- Run `supabase/add-job-title.sql` in Supabase SQL editor (if not already done)
+- Run `supabase/unassign-archived-people.sql` to clean up any archived people still assigned to seats
+- Test panning behavior on different screen sizes and browsers
+- Consider adding zoom functionality to map (pinch-to-zoom, zoom controls)
+- Consider adding CSV export feature for backing up people data
+- Test job title field with various character lengths and special characters
+
+---
+
 ## 2026-03-31 — OTP Authentication Debugging & UI Polish
 
 **Changes:**

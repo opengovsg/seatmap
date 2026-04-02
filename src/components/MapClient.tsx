@@ -229,7 +229,7 @@ export function MapClient({ floor, initialSeats, initialPeople, userEmail, isDra
   )
 
   return (
-    <>
+    <div className="flex flex-col h-full">
       <NavBar
         seats={seats}
         userEmail={userEmail}
@@ -283,7 +283,7 @@ export function MapClient({ floor, initialSeats, initialPeople, userEmail, isDra
         </div>
       )}
 
-      <main className="relative flex-1 overflow-auto bg-muted/30">
+      <main className="relative flex-1 bg-muted/30 overflow-hidden">
         <SeatMap
           svgContent={floor.svg_content}
           seats={seats}
@@ -339,6 +339,6 @@ export function MapClient({ floor, initialSeats, initialPeople, userEmail, isDra
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   )
 }

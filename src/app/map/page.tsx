@@ -68,16 +68,14 @@ export default async function MapPage() {
   const people = await listPeople(isDraft)
 
   return (
-    <div className="flex flex-col h-full">
-      <MapClient
-        floor={floor}
-        initialSeats={normalizedSeats as Seat[]}
-        initialPeople={people}
-        userEmail={user.email ?? ''}
-        isDraft={isDraft}
-        draftName={draftName}
-        userIsAdmin={userIsAdmin}
-      />
-    </div>
+    <MapClient
+      floor={floor}
+      initialSeats={normalizedSeats as Seat[]}
+      initialPeople={people}
+      userEmail={user.email ?? ''}
+      isDraft={isDraft}
+      draftName={draftName}
+      userIsAdmin={userIsAdmin}
+    />
   )
 }

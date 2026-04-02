@@ -64,7 +64,7 @@ export function NavBar({
   }
 
   return (
-    <header className="border-b bg-background px-5 py-3 flex items-center gap-3 shrink-0 flex-wrap min-h-[56px]">
+    <header className="sticky top-0 z-10 border-b bg-background px-5 py-3 flex items-center gap-3 shrink-0 flex-wrap min-h-[56px]">
 
       {/* People button */}
       <Button

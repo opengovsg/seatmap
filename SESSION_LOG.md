@@ -1,3 +1,48 @@
+## 2026-04-02 — UX Improvements & Reserve Seat Team Tracking
+
+**Changes:**
+- **Person picker improvements**:
+  - Auto-select when only one person matches search filter
+  - Enter key selects highlighted person when one match
+  - Enter key in Notes field triggers Assign button
+  - Fixed UUID showing in combobox input (kept value as null)
+- **Reserved seat team tracking**:
+  - Updated `reserveSeat()` to accept and save team parameter
+  - Team now saved to `occupant_team` field for reserved seats
+  - Reserved seats appear when filtering by team in navbar
+  - Display team in reserved seat modal view
+  - Display team in seat tooltip for reserved seats
+- **Division cleanup**:
+  - Created `supabase/merge-duplicate-divisions.sql` to merge "Div A"→"Division A" and "Div B"→"Division B"
+  - Updated divisions in people, seats, and seat_drafts tables
+  - Cleaned up 232 people records with consistent division names
+- **Seat assignment displacement fix**:
+  - Updated `assignSeat()` to unseat displaced person when assigning to occupied seat
+  - Displaced person's `person_id` cleared and they appear in unseated list
+  - Works in both draft and live modes
+- **People panel search enhancement**:
+  - Search now works across all tabs (unseated, seated, archived)
+  - Tab counts update to show matches in each category
+  - No need to switch tabs to find a person
+
+**Decisions:**
+- **Notes tied to seat, not person**: Confirmed notes are stored on `seats` table, not `people` table - notes stay with physical location when person moves
+- **Team field for reserved seats**: Team was already in the UI form but wasn't being saved - now properly tracked for filtering and display
+- **Search across all tabs**: Better UX than limiting search to current tab - users can find anyone regardless of their status
+- **Auto-select single match**: Improves keyboard navigation flow when search narrows to one person
+
+**Current state:**
+All UX improvements implemented and working. Reserved seats now properly track team assignments. Division duplicates cleaned up. Search works globally across all people. Seat displacement properly unseats the displaced person.
+
+**Next steps:**
+- Test reserved seat team filtering with actual reservations
+- Verify displaced person workflow end-to-end (assign to occupied seat → check unseated list)
+- Consider adding division to reserved seat form (currently only has team)
+- Consider showing division in tooltips for reserved seats
+- Test search performance with large people lists (200+ entries)
+
+---
+
 ## 2026-04-02 — CSV Import, Archive Fix, Map Navigation
 
 **Changes:**

@@ -60,6 +60,22 @@ export async function assignSeat(
   if (personError || !person) throw new Error('Person not found.')
 
   if (await isDraftActive()) {
+    // Check if someone else is currently in this seat (will be displaced)
+    const { data: currentSeat } = await db
+      .from('seat_drafts')
+      .select('person_id')
+      .eq('seat_id', seatId)
+      .single()
+
+    // If seat has a different occupant, they become unseated
+    if (currentSeat?.person_id && currentSeat.person_id !== personId) {
+      // Clear their seat assignment by finding any other seats they might be in
+      await db
+        .from('seat_drafts')
+        .update({ person_id: null })
+        .eq('person_id', currentSeat.person_id)
+    }
+
     const { error } = await db.from('seat_drafts').update({
       status: 'OCCUPIED',
       person_id: personId,
@@ -76,6 +92,15 @@ export async function assignSeat(
   }
 
   const { data: old } = await db.from('seats').select('*').eq('id', seatId).single()
+
+  // If seat has a different occupant, they become unseated
+  if (old?.person_id && old.person_id !== personId) {
+    // Clear their seat assignment
+    await db
+      .from('seats')
+      .update({ person_id: null })
+      .eq('person_id', old.person_id)
+  }
 
   const { error } = await db.from('seats').update({
     status: 'OCCUPIED',
@@ -133,7 +158,7 @@ export async function unassignSeat(seatId: string) {
   })
 }
 
-export async function reserveSeat(seatId: string, notes: string) {
+export async function reserveSeat(seatId: string, notes: string, team?: string) {
   const db = createAdminClient()
   const email = await getEditorEmail()
 
@@ -141,7 +166,7 @@ export async function reserveSeat(seatId: string, notes: string) {
     const { error } = await db.from('seat_drafts').update({
       status: 'RESERVED',
       occupant_name: null,
-      occupant_team: null,
+      occupant_team: team || null,
       occupant_division: null,
       notes: notes || null,
       updated_by: email,
@@ -154,6 +179,7 @@ export async function reserveSeat(seatId: string, notes: string) {
 
   const { error } = await db.from('seats').update({
     status: 'RESERVED',
+    occupant_team: team || null,
     notes: notes || null,
   }).eq('id', seatId)
   if (error) throw new Error(error.message)

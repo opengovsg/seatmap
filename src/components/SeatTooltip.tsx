@@ -62,6 +62,11 @@ export function SeatTooltip({ seat, x, y }: SeatTooltipProps) {
           )}
         </div>
       )}
+      {seat.status === 'RESERVED' && seat.occupant_team && !seat.occupant_name && (
+        <div className="mt-1 text-muted-foreground text-xs">
+          {seat.occupant_team}
+        </div>
+      )}
       {seat.notes && (
         <p className="mt-1 text-muted-foreground text-xs">{seat.notes}</p>
       )}

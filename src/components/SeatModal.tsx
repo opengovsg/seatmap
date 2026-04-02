@@ -99,8 +99,14 @@ function PersonPicker({
                 showClear={false}
                 className="w-full"
                 autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && filtered.length === 1) {
+                    e.preventDefault()
+                    onSelect(filtered[0])
+                  }
+                }}
               />
-              <ComboboxContent>
+              <ComboboxContent side="bottom" align="start">
                 <ComboboxList>
                   {filtered.map(p => (
                     <ComboboxItem key={p.id} value={p.id}>
@@ -155,7 +161,18 @@ function PersonPicker({
       {selectedPerson && (
         <Field>
           <FieldLabel htmlFor="assign-notes">Notes</FieldLabel>
-          <Input id="assign-notes" value={notes} onChange={e => onNotes(e.target.value)} placeholder="Optional" />
+          <Input
+            id="assign-notes"
+            value={notes}
+            onChange={e => onNotes(e.target.value)}
+            placeholder="Optional"
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !isPending) {
+                e.preventDefault()
+                onSubmit()
+              }
+            }}
+          />
         </Field>
       )}
     </FieldGroup>
@@ -334,10 +351,10 @@ export function SeatModal({ seat, teams, divisions, unseatedPeople, initialPerso
                   notes={reserveNotes} onNotes={setReserveNotes}
                   team={reserveTeam} onTeam={setReserveTeam}
                   teams={teams} isPending={isPending}
-                  onSubmit={() => run(() => reserveSeat(seat.id, reserveNotes.trim()), 'Seat has been reserved.')}
+                  onSubmit={() => run(() => reserveSeat(seat.id, reserveNotes.trim(), reserveTeam.trim()), 'Seat has been reserved.')}
                 />
                 <DialogFooter>
-                  <Button size="lg" className="w-full" disabled={isPending} onClick={() => run(() => reserveSeat(seat.id, reserveNotes.trim()), 'Seat has been reserved.')}>
+                  <Button size="lg" className="w-full" disabled={isPending} onClick={() => run(() => reserveSeat(seat.id, reserveNotes.trim(), reserveTeam.trim()), 'Seat has been reserved.')}>
                     {isPending ? 'Saving…' : 'Reserve'}
                   </Button>
                 </DialogFooter>
@@ -441,8 +458,13 @@ export function SeatModal({ seat, teams, divisions, unseatedPeople, initialPerso
           {/* ── RESERVED: view ── */}
           {seat.status === 'RESERVED' && mode === 'view' && (
             <>
-              <div className="text-sm">
+              <div className="text-sm space-y-2">
                 {seat.notes && <p className="text-muted-foreground">{seat.notes}</p>}
+                {seat.occupant_team && (
+                  <p className="text-muted-foreground">
+                    <span className="font-medium text-foreground">Team:</span> {seat.occupant_team}
+                  </p>
+                )}
               </div>
               <DialogFooter>
                 <Button size="lg" onClick={enterAssign}>Assign person</Button>

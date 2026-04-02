@@ -36,15 +36,19 @@ export function UnseatedPanel({ open, onClose, people, userIsAdmin, teams, divis
   const [confirmDelete, setConfirmDelete] = useState<Person | null>(null)
   const [isPending, startTransition]      = useTransition()
 
-  const unseated = people.filter(p => !p.is_archived && !p.seat)
-  const seated   = people.filter(p => !p.is_archived &&  p.seat)
-  const archived = people.filter(p =>  p.is_archived)
+  // Apply search filter first across ALL people
+  const searchLower = search.toLowerCase()
+  const searchFiltered = search.trim()
+    ? people.filter(p => p.name.toLowerCase().includes(searchLower))
+    : people
+
+  const unseated = searchFiltered.filter(p => !p.is_archived && !p.seat)
+  const seated   = searchFiltered.filter(p => !p.is_archived &&  p.seat)
+  const archived = searchFiltered.filter(p =>  p.is_archived)
 
   const counts = { unseated: unseated.length, seated: seated.length, archived: archived.length }
 
-  const activeList = filter === 'unseated' ? unseated : filter === 'seated' ? seated : archived
-
-  const filtered = activeList.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
+  const filtered = filter === 'unseated' ? unseated : filter === 'seated' ? seated : archived
 
   function handleArchive(person: Person) {
     startTransition(async () => {

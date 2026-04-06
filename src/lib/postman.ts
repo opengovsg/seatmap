@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto'
+import { randomInt } from 'crypto'
 
 const POSTMAN_API_URL = 'https://api.postman.gov.sg/v1/transactional/email/send'
 const POSTMAN_API_KEY = process.env.POSTMAN_API_KEY
@@ -6,13 +6,13 @@ const FROM_EMAIL = process.env.POSTMAN_FROM_EMAIL || 'seatmap@open.gov.sg'
 
 /**
  * Generate a cryptographically secure 6-digit OTP code
+ * Uses crypto.randomInt with rejection sampling to avoid bias
  */
 export function generateOtpCode(): string {
-  // Generate 3 random bytes, convert to number, take modulo 1000000 to get 6 digits
-  const buffer = randomBytes(3)
-  const num = buffer.readUIntBE(0, 3)
-  const code = (num % 1000000).toString().padStart(6, '0')
-  return code
+  return Array(6)
+    .fill(0)
+    .map(() => randomInt(0, 10))
+    .join('')
 }
 
 /**

@@ -68,6 +68,9 @@ export async function assignSeat(
       .eq('seat_id', seatId)
       .single()
 
+    // Get the old seat state before modification
+    const { data: old } = await db.from('seat_drafts').select('*').eq('seat_id', seatId).single()
+
     // If seat has a different occupant, they become unseated
     if (currentSeat?.person_id && currentSeat.person_id !== personId) {
       // Clear their seat assignment by finding any other seats they might be in
@@ -88,7 +91,11 @@ export async function assignSeat(
       updated_at: new Date().toISOString(),
     }).eq('seat_id', seatId)
     if (error) throw new Error(error.message)
-    await writeAudit(seatId, 'ASSIGN', email, { field: 'occupant_name', newValue: person.name })
+    await writeAudit(seatId, 'ASSIGN', email, {
+      field: 'occupant_name',
+      newValue: person.name,
+      before: old ? { status: old.status, occupant_name: old.occupant_name, occupant_team: old.occupant_team, occupant_division: old.occupant_division, notes: old.notes, label: old.label } : null,
+    })
     return
   }
 
@@ -126,7 +133,7 @@ export async function unassignSeat(seatId: string) {
   const email = await requireAuth()
 
   if (await isDraftActive()) {
-    const { data: old } = await db.from('seat_drafts').select('occupant_name').eq('seat_id', seatId).single()
+    const { data: old } = await db.from('seat_drafts').select('*').eq('seat_id', seatId).single()
     const { error } = await db.from('seat_drafts').update({
       status: 'AVAILABLE',
       person_id: null,
@@ -137,7 +144,11 @@ export async function unassignSeat(seatId: string) {
       updated_at: new Date().toISOString(),
     }).eq('seat_id', seatId)
     if (error) throw new Error(error.message)
-    await writeAudit(seatId, 'UNASSIGN', email, { field: 'occupant_name', oldValue: old?.occupant_name ?? null })
+    await writeAudit(seatId, 'UNASSIGN', email, {
+      field: 'occupant_name',
+      oldValue: old?.occupant_name ?? null,
+      before: old ? { status: old.status, occupant_name: old.occupant_name, occupant_team: old.occupant_team, occupant_division: old.occupant_division, notes: old.notes, label: old.label } : null,
+    })
     return
   }
 
@@ -164,6 +175,7 @@ export async function reserveSeat(seatId: string, notes: string, team?: string) 
   const email = await requireAuth()
 
   if (await isDraftActive()) {
+    const { data: old } = await db.from('seat_drafts').select('*').eq('seat_id', seatId).single()
     const { error } = await db.from('seat_drafts').update({
       status: 'RESERVED',
       occupant_name: null,
@@ -174,10 +186,15 @@ export async function reserveSeat(seatId: string, notes: string, team?: string) 
       updated_at: new Date().toISOString(),
     }).eq('seat_id', seatId)
     if (error) throw new Error(error.message)
-    await writeAudit(seatId, 'RESERVE', email, { field: 'status', newValue: notes ? `RESERVED — ${notes}` : 'RESERVED' })
+    await writeAudit(seatId, 'RESERVE', email, {
+      field: 'status',
+      newValue: notes ? `RESERVED — ${notes}` : 'RESERVED',
+      before: old ? { status: old.status, occupant_name: old.occupant_name, occupant_team: old.occupant_team, occupant_division: old.occupant_division, notes: old.notes, label: old.label } : null,
+    })
     return
   }
 
+  const { data: old } = await db.from('seats').select('*').eq('id', seatId).single()
   const { error } = await db.from('seats').update({
     status: 'RESERVED',
     occupant_team: team || null,
@@ -188,6 +205,7 @@ export async function reserveSeat(seatId: string, notes: string, team?: string) 
   await writeAudit(seatId, 'RESERVE', email, {
     field: 'status',
     newValue: notes ? `RESERVED — ${notes}` : 'RESERVED',
+    before: old ? { status: old.status, occupant_name: old.occupant_name, occupant_team: old.occupant_team, occupant_division: old.occupant_division, notes: old.notes, label: old.label } : null,
   })
 }
 
@@ -196,7 +214,7 @@ export async function makeAvailable(seatId: string) {
   const email = await requireAuth()
 
   if (await isDraftActive()) {
-    const { data: old } = await db.from('seat_drafts').select('status').eq('seat_id', seatId).single()
+    const { data: old } = await db.from('seat_drafts').select('*').eq('seat_id', seatId).single()
     const { error } = await db.from('seat_drafts').update({
       status: 'AVAILABLE',
       occupant_name: null,
@@ -207,7 +225,12 @@ export async function makeAvailable(seatId: string) {
       updated_at: new Date().toISOString(),
     }).eq('seat_id', seatId)
     if (error) throw new Error(error.message)
-    await writeAudit(seatId, 'UPDATE', email, { field: 'status', oldValue: old?.status ?? null, newValue: 'AVAILABLE' })
+    await writeAudit(seatId, 'UPDATE', email, {
+      field: 'status',
+      oldValue: old?.status ?? null,
+      newValue: 'AVAILABLE',
+      before: old ? { status: old.status, occupant_name: old.occupant_name, occupant_team: old.occupant_team, occupant_division: old.occupant_division, notes: old.notes, label: old.label } : null,
+    })
     return
   }
 
@@ -251,10 +274,16 @@ export async function updateSeat(
       updated_at: new Date().toISOString(),
     }).eq('seat_id', seatId)
     if (error) throw new Error(error.message)
+    const before = old ? { status: old.status, occupant_name: old.occupant_name, occupant_team: old.occupant_team, occupant_division: old.occupant_division, notes: old.notes, label: old.label } : null
     const fields = Object.keys(updates) as (keyof typeof updates)[]
     for (const field of fields) {
       if (old && updates[field] !== old[field]) {
-        await writeAudit(seatId, 'UPDATE', email, { field, oldValue: old[field] ?? null, newValue: updates[field] ?? null })
+        await writeAudit(seatId, 'UPDATE', email, {
+          field,
+          oldValue: old[field] ?? null,
+          newValue: updates[field] ?? null,
+          before,
+        })
       }
     }
     return
@@ -362,11 +391,13 @@ export async function moveSeat(fromSeatId: string, toSeatId: string) {
       field: 'seat',
       oldValue: fromSeat.label,
       newValue: `${toSeat.label} (swapped with ${toSeat.occupant_name})`,
+      before: { status: fromSeat.status, occupant_name: fromSeat.occupant_name, occupant_team: fromSeat.occupant_team, occupant_division: fromSeat.occupant_division, notes: fromSeat.notes, label: fromSeat.label },
     })
     await writeAudit(toSeatId, 'MOVE', email, {
       field: 'seat',
       oldValue: toSeat.label,
       newValue: `${fromSeat.label} (swapped with ${fromSeat.occupant_name})`,
+      before: { status: toSeat.status, occupant_name: toSeat.occupant_name, occupant_team: toSeat.occupant_team, occupant_division: toSeat.occupant_division, notes: toSeat.notes, label: toSeat.label },
     })
   } else if (isReserved) {
     // Move person into reserved seat — reservation transfers to the vacated seat
@@ -394,11 +425,13 @@ export async function moveSeat(fromSeatId: string, toSeatId: string) {
       field: 'seat',
       oldValue: fromSeat.label,
       newValue: `${toSeat.label} (reservation moved here)`,
+      before: { status: fromSeat.status, occupant_name: fromSeat.occupant_name, occupant_team: fromSeat.occupant_team, occupant_division: fromSeat.occupant_division, notes: fromSeat.notes, label: fromSeat.label },
     })
     await writeAudit(toSeatId, 'MOVE', email, {
       field: 'seat',
       oldValue: toSeat.label,
       newValue: fromSeat.label,
+      before: { status: toSeat.status, occupant_name: toSeat.occupant_name, occupant_team: toSeat.occupant_team, occupant_division: toSeat.occupant_division, notes: toSeat.notes, label: toSeat.label },
     })
   } else {
     // Move person to an available seat
@@ -424,6 +457,7 @@ export async function moveSeat(fromSeatId: string, toSeatId: string) {
       field: 'seat',
       oldValue: fromSeat.label,
       newValue: toSeat.label,
+      before: { status: fromSeat.status, occupant_name: fromSeat.occupant_name, occupant_team: fromSeat.occupant_team, occupant_division: fromSeat.occupant_division, notes: fromSeat.notes, label: fromSeat.label },
     })
   }
 

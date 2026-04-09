@@ -416,3 +416,35 @@ Draft mode is fully working — seats render with correct colors in draft mode. 
 - Consider showing a count of changed seats in the draft banner (e.g. "X seats differ from live")
 - Consider adding a visual diff view in the admin page to show what will change on publish
 - Remove `export const dynamic = 'force-dynamic'` if it causes performance issues in production (the Supabase auth cookie already opts out of caching, so it may be redundant)
+
+## 2026-04-09 — Bug Fixes: Scrolling, Undo, and People List UX
+
+**Changes:**
+- Fixed admin page scrolling issue by adding `overflow-y-auto` to page wrapper (was blocked by `overflow-hidden` on body)
+- Fixed undo functionality for all seat actions by adding `before` snapshots to audit logs:
+  - ASSIGN (draft and live modes)
+  - UNASSIGN (draft and live modes)
+  - RESERVE (draft and live modes)
+  - UPDATE/makeAvailable (draft and live modes)
+  - UPDATE/updateSeat (draft and live modes)
+  - MOVE (all 3 types: swap, reserved, regular - both modes)
+- Fixed people list click handlers:
+  - Clicking person name/details now always opens PersonModal (edit mode)
+  - Clicking Move icon triggers seat assignment flow with `stopPropagation()`
+- Improved Move icon visibility by matching three-dots menu color (removed faded styling)
+
+**Decisions:**
+- Existing audit log entries without `before` field cannot be undone (no backfill due to risk)
+- People list UX: Consistent click behavior across all person states (unseated/seated/archived)
+- Move icon remains visible on hover for unseated people as explicit seat assignment action
+
+**Current state:**
+- Admin page scrolls properly
+- All new seat changes can be undone by admins/owners (including actions by other users)
+- People list has clear, separated click targets (details vs. move)
+- Old audit entries (before this fix) remain non-undoable
+
+**Next steps:**
+- Monitor user feedback on new people list interaction pattern
+- Consider adding visual feedback when clicking Move icon (loading state, confirmation)
+- Optional: Add "before" snapshot backfill script if historical undo becomes critical requirement

@@ -218,8 +218,8 @@ function PersonRow({ person, userIsAdmin, onEdit, onAssign, onUnassign, onArchiv
         : <UserRound      className="size-4 text-muted-foreground shrink-0 mt-0.5" />
       }
 
-      {/* Name / meta — clickable to assign (unseated) or edit (others) */}
-      <div className="flex-1 min-w-0 cursor-pointer" onClick={onAssign ?? onEdit}>
+      {/* Name / meta — clickable to open details */}
+      <div className="flex-1 min-w-0 cursor-pointer" onClick={onEdit}>
         <p className={`text-sm font-medium truncate ${person.is_archived ? 'text-muted-foreground' : ''}`}>
           {person.name}
         </p>
@@ -241,7 +241,12 @@ function PersonRow({ person, userIsAdmin, onEdit, onAssign, onUnassign, onArchiv
       {/* Action buttons — visible on hover */}
       <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 mt-0.5">
         {onAssign && (
-          <Button size="icon-sm" variant="ghost" onClick={onAssign} title="Pick a seat" className="text-muted-foreground/50 hover:text-muted-foreground">
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            onClick={(e) => { e.stopPropagation(); onAssign() }}
+            title="Pick a seat"
+          >
             <Move className="size-3.5" />
           </Button>
         )}

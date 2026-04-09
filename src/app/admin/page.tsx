@@ -50,7 +50,7 @@ export default async function AdminPage() {
     : 0
 
   return (
-    <div className="min-h-svh bg-background">
+    <div className="min-h-svh bg-background overflow-y-auto">
       <header className="border-b px-6 py-4 flex items-center gap-4">
         <a href="/map" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
           ← Back to map

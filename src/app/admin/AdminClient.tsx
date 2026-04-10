@@ -1,12 +1,12 @@
 'use client'
 
-import { useRef, useState, useTransition, useMemo } from 'react'
+import { useRef, useState, useTransition, useMemo, useEffect } from 'react'
 import {
   useReactTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel,
   flexRender, type ColumnDef, type SortingState,
 } from '@tanstack/react-table'
 import { uploadFloor, restoreSnapshot, listSnapshots, listAuditLogs } from '@/app/actions/floor'
-import { addAdminAction, removeAdminAction, transferOwnershipAction, listAdminsAction } from '@/app/actions/admins'
+import { addAdminAction, removeAdminAction, transferOwnershipAction, listAdminsAction, addEditorAction, removeEditorAction, listEditorsAction } from '@/app/actions/admins'
 import { initializeDraft, publishDraft, discardDraft, getDraftSeatCount, renameDraft } from '@/app/actions/draft'
 import { undoAuditEntry } from '@/app/actions/seats'
 import { StartDraftModal } from '@/components/StartDraftModal'
@@ -268,8 +268,56 @@ export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, user
     })
   }
 
+  // ── Editors state ──
+  const [editors, setEditors]               = useState<AdminRecord[]>([])
+  const [newEditorEmail, setNewEditorEmail] = useState('')
+  const [editorError, setEditorError]       = useState<string | null>(null)
+  const [editorMsg, setEditorMsg]           = useState<string | null>(null)
+
+  async function refreshEditors() {
+    if (userRole === 'admin' || userRole === 'owner') {
+      setEditors(await listEditorsAction())
+    }
+  }
+
+  function handleAddEditor(e: React.FormEvent) {
+    e.preventDefault()
+    setEditorError(null)
+    setEditorMsg(null)
+    startTransition(async () => {
+      try {
+        await addEditorAction(newEditorEmail.trim())
+        setNewEditorEmail('')
+        setEditorMsg(`${newEditorEmail.trim()} added as editor.`)
+        await refreshEditors()
+      } catch (err) {
+        setEditorError(err instanceof Error ? err.message : 'Failed to add editor.')
+      }
+    })
+  }
+
+  function handleRemoveEditor(email: string) {
+    setEditorError(null)
+    setEditorMsg(null)
+    startTransition(async () => {
+      try {
+        await removeEditorAction(email)
+        setEditorMsg(`${email} removed.`)
+        await refreshEditors()
+      } catch (err) {
+        setEditorError(err instanceof Error ? err.message : 'Failed to remove editor.')
+      }
+    })
+  }
+
   const [logs, setLogs]           = useState<AuditLog[]>(initialLogs)
   const [undoError, setUndoError] = useState<string | null>(null)
+
+  // Load editors on mount if user is admin or owner
+  useEffect(() => {
+    refreshEditors()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function refreshLogs() {
     setLogs(await listAuditLogs() as AuditLog[])
@@ -485,6 +533,210 @@ export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, user
         </CardContent>
       </Card>
 
+      {/* ── Editors Management ── */}
+      {(userRole === 'admin' || userRole === 'owner') && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Editors</CardTitle>
+            <CardDescription>
+              Editors can edit seat assignments and manage people, but cannot access admin functions.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div className="rounded-md border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {editors.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center text-sm text-muted-foreground py-4">
+                        No editors yet
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    editors
+                      .slice()
+                      .sort((a, b) => a.email.localeCompare(b.email))
+                      .map(editor => (
+                        <TableRow key={editor.email}>
+                          <TableCell className="text-sm">{editor.email}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">Editor</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={isPending}
+                              onClick={() => handleRemoveEditor(editor.email)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              Remove
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            <form onSubmit={handleAddEditor} className="flex gap-2 max-w-sm">
+              <Input
+                type="email"
+                placeholder="colleague@open.gov.sg"
+                value={newEditorEmail}
+                onChange={e => setNewEditorEmail(e.target.value)}
+                required
+                disabled={isPending}
+              />
+              <Button type="submit" disabled={isPending || !newEditorEmail.trim()}>
+                Add editor
+              </Button>
+            </form>
+
+            {editorError && (
+              <div className="flex items-center gap-2 text-sm text-destructive">
+                <AlertTriangle className="size-4 shrink-0" />
+                {editorError}
+              </div>
+            )}
+            {editorMsg && <p className="text-sm text-muted-foreground">{editorMsg}</p>}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Admins (owner only) ── */}
+      {userRole === 'owner' && (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle>Admins</CardTitle>
+              <CardDescription>
+                Admins can access this page. Only you (the owner) can add or remove them.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <div className="rounded-md border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {admins
+                      .filter(a => a.role === 'owner' || a.role === 'admin')
+                      .slice()
+                      .sort((a, b) => (a.role === 'owner' ? -1 : b.role === 'owner' ? 1 : a.email.localeCompare(b.email)))
+                      .map(admin => (
+                        <TableRow key={admin.email}>
+                          <TableCell className="text-sm">{admin.email}</TableCell>
+                          <TableCell>
+                            <Badge variant={admin.role === 'owner' ? 'default' : 'secondary'}>
+                              {admin.role === 'owner' ? 'Owner' : 'Admin'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {admin.role !== 'owner' && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={isPending}
+                                onClick={() => handleRemoveAdmin(admin.email)}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                Remove
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <form onSubmit={handleAddAdmin} className="flex gap-2 max-w-sm">
+                <Input
+                  type="email"
+                  placeholder="colleague@open.gov.sg"
+                  value={newAdminEmail}
+                  onChange={e => setNewAdminEmail(e.target.value)}
+                  required
+                  disabled={isPending}
+                />
+                <Button type="submit" disabled={isPending || !newAdminEmail.trim()}>
+                  Add admin
+                </Button>
+              </form>
+
+              {adminError && (
+                <div className="flex items-center gap-2 text-sm text-destructive">
+                  <AlertTriangle className="size-4 shrink-0" />
+                  {adminError}
+                </div>
+              )}
+              {adminMsg && <p className="text-sm text-muted-foreground">{adminMsg}</p>}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Transfer ownership</CardTitle>
+              <CardDescription>
+                Transfer your owner role to another admin. You will be demoted to admin.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              {!transferConfirm ? (
+                <form
+                  onSubmit={e => { e.preventDefault(); setTransferConfirm(true); setTransferError(null) }}
+                  className="flex gap-2 max-w-sm"
+                >
+                  <Input
+                    type="email"
+                    placeholder="new-owner@open.gov.sg"
+                    value={transferEmail}
+                    onChange={e => setTransferEmail(e.target.value)}
+                    required
+                    disabled={isPending}
+                  />
+                  <Button type="submit" variant="outline" disabled={isPending || !transferEmail.trim()}>
+                    Transfer
+                  </Button>
+                </form>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-muted-foreground">
+                    Transfer ownership to <strong>{transferEmail}</strong>? You will become a regular admin.
+                  </span>
+                  <Button size="sm" variant="destructive" disabled={isPending} onClick={handleTransferConfirm}>
+                    {isPending ? 'Transferring…' : 'Yes, transfer'}
+                  </Button>
+                  <Button size="sm" variant="ghost" disabled={isPending} onClick={() => setTransferConfirm(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              )}
+              {transferError && (
+                <div className="flex items-center gap-2 text-sm text-destructive">
+                  <AlertTriangle className="size-4 shrink-0" />
+                  {transferError}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
+
       {/* ── Upload section ── */}
       <Card>
         <CardHeader>
@@ -591,130 +843,6 @@ export function AdminClient({ initialSnapshots, initialLogs, initialAdmins, user
           )}
         </CardContent>
       </Card>
-
-      {/* ── Admins (owner only) ── */}
-      {userRole === 'owner' && (
-        <>
-          <Card>
-            <CardHeader>
-              <CardTitle>Admins</CardTitle>
-              <CardDescription>
-                Admins can access this page. Only you (the owner) can add or remove them.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              <div className="rounded-md border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {admins
-                      .slice()
-                      .sort((a, b) => (a.role === 'owner' ? -1 : b.role === 'owner' ? 1 : a.email.localeCompare(b.email)))
-                      .map(admin => (
-                        <TableRow key={admin.email}>
-                          <TableCell className="text-sm">{admin.email}</TableCell>
-                          <TableCell>
-                            <Badge variant={admin.role === 'owner' ? 'default' : 'secondary'}>
-                              {admin.role === 'owner' ? 'Owner' : 'Admin'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {admin.role !== 'owner' && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                disabled={isPending}
-                                onClick={() => handleRemoveAdmin(admin.email)}
-                                className="text-destructive hover:text-destructive"
-                              >
-                                Remove
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              <form onSubmit={handleAddAdmin} className="flex gap-2 max-w-sm">
-                <Input
-                  type="email"
-                  placeholder="colleague@open.gov.sg"
-                  value={newAdminEmail}
-                  onChange={e => setNewAdminEmail(e.target.value)}
-                  required
-                  disabled={isPending}
-                />
-                <Button type="submit" disabled={isPending || !newAdminEmail.trim()}>
-                  Add admin
-                </Button>
-              </form>
-
-              {adminError && (
-                <div className="flex items-center gap-2 text-sm text-destructive">
-                  <AlertTriangle className="size-4 shrink-0" />
-                  {adminError}
-                </div>
-              )}
-              {adminMsg && <p className="text-sm text-muted-foreground">{adminMsg}</p>}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Transfer ownership</CardTitle>
-              <CardDescription>
-                Transfer your owner role to another admin. You will be demoted to admin.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              {!transferConfirm ? (
-                <form
-                  onSubmit={e => { e.preventDefault(); setTransferConfirm(true); setTransferError(null) }}
-                  className="flex gap-2 max-w-sm"
-                >
-                  <Input
-                    type="email"
-                    placeholder="new-owner@open.gov.sg"
-                    value={transferEmail}
-                    onChange={e => setTransferEmail(e.target.value)}
-                    required
-                    disabled={isPending}
-                  />
-                  <Button type="submit" variant="outline" disabled={isPending || !transferEmail.trim()}>
-                    Transfer
-                  </Button>
-                </form>
-              ) : (
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-muted-foreground">
-                    Transfer ownership to <strong>{transferEmail}</strong>? You will become a regular admin.
-                  </span>
-                  <Button size="sm" variant="destructive" disabled={isPending} onClick={handleTransferConfirm}>
-                    {isPending ? 'Transferring…' : 'Yes, transfer'}
-                  </Button>
-                  <Button size="sm" variant="ghost" disabled={isPending} onClick={() => setTransferConfirm(false)}>
-                    Cancel
-                  </Button>
-                </div>
-              )}
-              {transferError && (
-                <div className="flex items-center gap-2 text-sm text-destructive">
-                  <AlertTriangle className="size-4 shrink-0" />
-                  {transferError}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </>
-      )}
 
     </div>
 

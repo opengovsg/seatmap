@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { isAdmin } from '@/lib/admins'
 import { parseSvg } from '@/lib/svg-parser'
 
 async function getEditorEmail(): Promise<string> {
@@ -31,9 +32,19 @@ async function requireAuth() {
   return user
 }
 
+async function requireAdmin(): Promise<string> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user?.email) throw new Error('Not authenticated.')
+  if (!(await isAdmin(user.email))) {
+    throw new Error('Admin access required.')
+  }
+  return user.email
+}
+
 // ── Upload a new floor plan SVG ───────────────────────────────────────────────
 export async function uploadFloor(svgContent: string): Promise<UploadResult> {
-  await requireAuth()
+  await requireAdmin()
   const db = createAdminClient()
 
   // Load current floor
@@ -148,8 +159,7 @@ export async function listSnapshots(): Promise<Snapshot[]> {
 
 // ── Restore a snapshot ────────────────────────────────────────────────────────
 export async function restoreSnapshot(snapshotId: string): Promise<void> {
-  const user = await requireAuth()
-  const email = user.email ?? 'unknown'
+  const email = await requireAdmin()
   const db = createAdminClient()
 
   // Load the target snapshot

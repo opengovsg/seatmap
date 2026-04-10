@@ -20,6 +20,7 @@ interface UnseatedPanelProps {
   onClose: () => void
   people: Person[]
   userIsAdmin: boolean
+  canEdit: boolean
   teams: string[]
   divisions: string[]
   onPersonAssign: (person: Person) => void
@@ -28,7 +29,7 @@ interface UnseatedPanelProps {
 
 type FilterTab = 'unseated' | 'seated' | 'archived'
 
-export function UnseatedPanel({ open, onClose, people, userIsAdmin, teams, divisions, onPersonAssign, onRefresh }: UnseatedPanelProps) {
+export function UnseatedPanel({ open, onClose, people, userIsAdmin, canEdit, teams, divisions, onPersonAssign, onRefresh }: UnseatedPanelProps) {
   const [search, setSearch]               = useState('')
   const [filter, setFilter]               = useState<FilterTab>('unseated')
   const [showAdd, setShowAdd]             = useState(false)
@@ -107,9 +108,11 @@ export function UnseatedPanel({ open, onClose, people, userIsAdmin, teams, divis
               className="pl-8 h-8 text-sm"
             />
           </div>
-          <Button size="icon" variant="outline" onClick={() => setShowAdd(true)} title="Add person">
-            <UserRoundPlus className="size-4" />
-          </Button>
+          {canEdit && (
+            <Button size="icon" variant="outline" onClick={() => setShowAdd(true)} title="Add person">
+              <UserRoundPlus className="size-4" />
+            </Button>
+          )}
         </div>
 
         {/* Filter tabs */}
@@ -143,9 +146,10 @@ export function UnseatedPanel({ open, onClose, people, userIsAdmin, teams, divis
                   key={person.id}
                   person={person}
                   userIsAdmin={userIsAdmin}
+                  canEdit={canEdit}
                   onEdit={() => setEditingPerson(person)}
-                  onAssign={filter !== 'archived' ? () => { onClose(); onPersonAssign(person) } : undefined}
-                  onUnassign={filter === 'seated' ? () => handleUnassign(person) : undefined}
+                  onAssign={filter !== 'archived' && canEdit ? () => { onClose(); onPersonAssign(person) } : undefined}
+                  onUnassign={filter === 'seated' && canEdit ? () => handleUnassign(person) : undefined}
                   onArchive={filter !== 'archived' ? () => handleArchive(person) : undefined}
                   onUnarchive={filter === 'archived' ? () => handleUnarchive(person) : undefined}
                   onDelete={filter === 'archived' && userIsAdmin ? () => setConfirmDelete(person) : undefined}
@@ -198,9 +202,10 @@ export function UnseatedPanel({ open, onClose, people, userIsAdmin, teams, divis
   )
 }
 
-function PersonRow({ person, userIsAdmin, onEdit, onAssign, onUnassign, onArchive, onUnarchive, onDelete, isPending }: {
+function PersonRow({ person, userIsAdmin, canEdit, onEdit, onAssign, onUnassign, onArchive, onUnarchive, onDelete, isPending }: {
   person: Person
   userIsAdmin: boolean
+  canEdit: boolean
   onEdit: () => void
   onAssign?: () => void
   onUnassign?: () => void
@@ -256,7 +261,7 @@ function PersonRow({ person, userIsAdmin, onEdit, onAssign, onUnassign, onArchiv
             <MoreHorizontal className="size-3.5" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-36">
-            <DropdownMenuItem onClick={onEdit}>Edit</DropdownMenuItem>
+            {canEdit && <DropdownMenuItem onClick={onEdit}>Edit</DropdownMenuItem>}
             {onUnassign && (
               <>
                 <DropdownMenuSeparator />

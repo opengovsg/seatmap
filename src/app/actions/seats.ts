@@ -2,11 +2,22 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { isEditor } from '@/lib/admins'
 
 async function requireAuth(): Promise<string> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user?.email) throw new Error('Not authenticated.')
+  return user.email
+}
+
+async function requireEditor(): Promise<string> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user?.email) throw new Error('Not authenticated.')
+  if (!(await isEditor(user.email))) {
+    throw new Error('Editor access required.')
+  }
   return user.email
 }
 
@@ -50,7 +61,7 @@ export async function assignSeat(
   notes: string,
 ) {
   const db = createAdminClient()
-  const email = await requireAuth()
+  const email = await requireEditor()
 
   // Look up person details to sync into occupant cache fields
   const { data: person, error: personError } = await db
@@ -130,7 +141,7 @@ export async function assignSeat(
 
 export async function unassignSeat(seatId: string) {
   const db = createAdminClient()
-  const email = await requireAuth()
+  const email = await requireEditor()
 
   if (await isDraftActive()) {
     const { data: old } = await db.from('seat_drafts').select('*').eq('seat_id', seatId).single()
@@ -172,7 +183,7 @@ export async function unassignSeat(seatId: string) {
 
 export async function reserveSeat(seatId: string, notes: string, team?: string) {
   const db = createAdminClient()
-  const email = await requireAuth()
+  const email = await requireEditor()
 
   if (await isDraftActive()) {
     const { data: old } = await db.from('seat_drafts').select('*').eq('seat_id', seatId).single()
@@ -211,7 +222,7 @@ export async function reserveSeat(seatId: string, notes: string, team?: string) 
 
 export async function makeAvailable(seatId: string) {
   const db = createAdminClient()
-  const email = await requireAuth()
+  const email = await requireEditor()
 
   if (await isDraftActive()) {
     const { data: old } = await db.from('seat_drafts').select('*').eq('seat_id', seatId).single()
@@ -264,7 +275,7 @@ export async function updateSeat(
   }
 ) {
   const db = createAdminClient()
-  const email = await requireAuth()
+  const email = await requireEditor()
 
   if (await isDraftActive()) {
     const { data: old } = await db.from('seat_drafts').select('*').eq('seat_id', seatId).single()
@@ -353,7 +364,7 @@ export async function undoAuditEntry(auditLogId: string): Promise<void> {
 
 export async function moveSeat(fromSeatId: string, toSeatId: string) {
   const db = createAdminClient()
-  const email = await requireAuth()
+  const email = await requireEditor()
   const drafting = await isDraftActive()
   const table = drafting ? 'seat_drafts' : 'seats'
   const idCol = drafting ? 'seat_id' : 'id'

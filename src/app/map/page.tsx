@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { MapClient } from '@/components/MapClient'
 import { getDraftState } from '@/app/actions/draft'
-import { isAdmin } from '@/lib/admins'
+import { isAdmin, getUserRole } from '@/lib/admins'
 import { listPeople } from '@/app/actions/people'
 import type { Seat } from '@/types'
 
@@ -17,13 +17,16 @@ export default async function MapPage() {
 
   const db = createAdminClient()
 
-  const [{ data: floor }, draftState, userIsAdmin] = await Promise.all([
+  const email = user.email ?? ''
+  const [{ data: floor }, draftState, userIsAdmin, userRole] = await Promise.all([
     db.from('floors').select('id, name, svg_content').single(),
     getDraftState(),
-    isAdmin(user.email ?? ''),
+    isAdmin(email),
+    getUserRole(email),
   ])
   const isDraft   = draftState.isActive
   const draftName = draftState.name
+  const canEdit   = userRole !== 'user'
 
   if (!floor) {
     return (
@@ -76,6 +79,7 @@ export default async function MapPage() {
       isDraft={isDraft}
       draftName={draftName}
       userIsAdmin={userIsAdmin}
+      canEdit={canEdit}
     />
   )
 }

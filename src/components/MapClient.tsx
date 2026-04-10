@@ -33,9 +33,10 @@ interface MapClientProps {
   isDraft:        boolean
   draftName:      string | null
   userIsAdmin:    boolean
+  canEdit:        boolean
 }
 
-export function MapClient({ floor, initialSeats, initialPeople, userEmail, isDraft, draftName, userIsAdmin }: MapClientProps) {
+export function MapClient({ floor, initialSeats, initialPeople, userEmail, isDraft, draftName, userIsAdmin, canEdit }: MapClientProps) {
   const [seats,           setSeats]           = useState<Seat[]>(initialSeats)
   const [people,          setPeople]          = useState<Person[]>(initialPeople)
   const [selectedSeat,    setSelectedSeat]    = useState<Seat | null>(null)
@@ -298,6 +299,7 @@ export function MapClient({ floor, initialSeats, initialPeople, userEmail, isDra
         onClose={() => setPanelOpen(false)}
         people={people}
         userIsAdmin={userIsAdmin}
+        canEdit={canEdit}
         teams={liveTeams}
         divisions={liveDivisions}
         onPersonAssign={handlePersonAssign}
@@ -311,6 +313,7 @@ export function MapClient({ floor, initialSeats, initialPeople, userEmail, isDra
         divisions={liveDivisions}
         unseatedPeople={unseatedPeople}
         initialPerson={modalPerson}
+        canEdit={canEdit}
         onClose={() => {
           setSelectedSeat(null)
           setAssigningPerson(null)

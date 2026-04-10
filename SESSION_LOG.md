@@ -448,3 +448,37 @@ Draft mode is fully working — seats render with correct colors in draft mode. 
 - Monitor user feedback on new people list interaction pattern
 - Consider adding visual feedback when clicking Move icon (loading state, confirmation)
 - Optional: Add "before" snapshot backfill script if historical undo becomes critical requirement
+
+---
+
+## 2026-04-10 — Implemented Role-Based Access Control System
+
+**Changes:**
+- Created 3-tier RBAC: User (read-only), Editor (can edit seats/people), Admin/Owner (full access)
+- Added database migration for 'editor' role in admins table (`20260410_add_editor_role.sql`)
+- Protected backend operations with `requireEditor()` (6 seat actions, 5 people actions) and `requireAdmin()` (floor operations)
+- Built conditional UI rendering based on `canEdit` prop throughout map interface
+- Added editor management interface in admin panel with add/remove functionality
+- Moved Admins card below Editors card in admin panel for logical hierarchy
+- Fixed bug where editors were incorrectly showing in admins list
+
+**Decisions:**
+- **Security model**: Defense in depth - UI hides controls for UX, server actions enforce permissions for security
+- **Role hierarchy**: `owner (3) > admin (2) > editor (1) > user (0)` using numeric comparison
+- **Editor visibility**: Both admin and owner can manage editors (not owner-only like admins)
+- **Destructive operations**: Archive/delete remain admin-only even though editors can edit
+- **Card ordering**: Editors before Admins in UI to reflect permission hierarchy (lower first)
+
+**Current state:**
+- Full RBAC implementation complete and builds successfully
+- Database migration ready to run (`supabase db push`)
+- All TypeScript compilation passes with no errors
+- Existing users will default to 'user' role (read-only) until promoted
+- Owner can promote users to editor or admin via admin panel
+
+**Next steps:**
+- Run database migration: `supabase db push` or manually execute SQL
+- Deploy code to production environment
+- Test role permissions with different user types
+- Promote existing trusted users to editor/admin roles as needed
+- Consider adding role badge to navigation bar for user awareness (optional enhancement)

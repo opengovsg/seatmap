@@ -2,12 +2,23 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { isEditor } from '@/lib/admins'
 import type { Person } from '@/types'
 
 async function requireAuth(): Promise<string> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user?.email) throw new Error('Not authenticated.')
+  return user.email
+}
+
+async function requireEditor(): Promise<string> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user?.email) throw new Error('Not authenticated.')
+  if (!(await isEditor(user.email))) {
+    throw new Error('Editor access required.')
+  }
   return user.email
 }
 
@@ -57,7 +68,7 @@ export async function createPerson(
   division: string,
   jobTitle: string,
 ): Promise<Person> {
-  await requireAuth()
+  await requireEditor()
   const db = createAdminClient()
 
   const { data, error } = await db
@@ -79,7 +90,7 @@ export async function updatePerson(
   personId: string,
   updates: { name?: string; team?: string | null; division?: string | null; job_title?: string | null },
 ): Promise<void> {
-  await requireAuth()
+  await requireEditor()
   const db = createAdminClient()
 
   const cleaned = {
@@ -107,7 +118,7 @@ export async function updatePerson(
 }
 
 export async function archivePerson(personId: string): Promise<void> {
-  await requireAuth()
+  await requireEditor()
 
   // Unassign the person from their seat first (if they have one)
   await unassignSeatByPersonId(personId)
@@ -119,14 +130,14 @@ export async function archivePerson(personId: string): Promise<void> {
 }
 
 export async function unarchivePerson(personId: string): Promise<void> {
-  await requireAuth()
+  await requireEditor()
   const db = createAdminClient()
   const { error } = await db.from('people').update({ is_archived: false }).eq('id', personId)
   if (error) throw new Error(error.message)
 }
 
 export async function deletePerson(personId: string): Promise<void> {
-  await requireAuth()
+  await requireEditor()
   const db = createAdminClient()
   const { error } = await db.from('people').delete().eq('id', personId)
   if (error) throw new Error(error.message)

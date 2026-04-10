@@ -207,12 +207,13 @@ interface SeatModalProps {
   divisions: string[]
   unseatedPeople: Person[]
   initialPerson?: Person | null
+  canEdit: boolean
   onClose: () => void
   onUpdated: () => Promise<void>
   onMoveStart: (seat: Seat) => void
 }
 
-export function SeatModal({ seat, teams, divisions, unseatedPeople, initialPerson, onClose, onUpdated, onMoveStart }: SeatModalProps) {
+export function SeatModal({ seat, teams, divisions, unseatedPeople, initialPerson, canEdit, onClose, onUpdated, onMoveStart }: SeatModalProps) {
   // Open straight to assign mode if a person was pre-selected from the panel
   const [mode, setMode] = useState<Mode>(() =>
     initialPerson && seat?.status !== 'OCCUPIED' ? 'edit' : 'view'
@@ -325,41 +326,47 @@ export function SeatModal({ seat, teams, divisions, unseatedPeople, initialPerso
 
           {/* ── AVAILABLE: tabs ── */}
           {seat.status === 'AVAILABLE' && (
-            <Tabs defaultValue="assign">
-              <TabsList variant="line" className="w-full border-b rounded-none">
-                <TabsTrigger value="assign" className="flex-1">Assign seat</TabsTrigger>
-                <TabsTrigger value="reserve" className="flex-1">Reserve seat</TabsTrigger>
-              </TabsList>
-              <TabsContent value="assign">
-                <PersonPicker
-                  unseatedPeople={unseatedPeople}
-                  selectedPerson={selectedPerson}
-                  onSelect={setSelectedPerson}
-                  onNewPersonRequested={(name) => { setNewPersonName(name); setShowPersonModal(true) }}
-                  notes={notes} onNotes={setNotes}
-                  isPending={isPending}
-                  onSubmit={handleAssignSubmit}
-                />
-                <DialogFooter>
-                  <Button size="lg" className="w-full" disabled={isPending || !selectedPerson} onClick={handleAssignSubmit}>
-                    {isPending ? 'Saving…' : 'Assign'}
-                  </Button>
-                </DialogFooter>
-              </TabsContent>
-              <TabsContent value="reserve">
-                <ReserveForm
-                  notes={reserveNotes} onNotes={setReserveNotes}
-                  team={reserveTeam} onTeam={setReserveTeam}
-                  teams={teams} isPending={isPending}
-                  onSubmit={() => run(() => reserveSeat(seat.id, reserveNotes.trim(), reserveTeam.trim()), 'Seat has been reserved.')}
-                />
-                <DialogFooter>
-                  <Button size="lg" className="w-full" disabled={isPending} onClick={() => run(() => reserveSeat(seat.id, reserveNotes.trim(), reserveTeam.trim()), 'Seat has been reserved.')}>
-                    {isPending ? 'Saving…' : 'Reserve'}
-                  </Button>
-                </DialogFooter>
-              </TabsContent>
-            </Tabs>
+            <>
+              {canEdit ? (
+                <Tabs defaultValue="assign">
+                  <TabsList variant="line" className="w-full border-b rounded-none">
+                    <TabsTrigger value="assign" className="flex-1">Assign seat</TabsTrigger>
+                    <TabsTrigger value="reserve" className="flex-1">Reserve seat</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="assign">
+                    <PersonPicker
+                      unseatedPeople={unseatedPeople}
+                      selectedPerson={selectedPerson}
+                      onSelect={setSelectedPerson}
+                      onNewPersonRequested={(name) => { setNewPersonName(name); setShowPersonModal(true) }}
+                      notes={notes} onNotes={setNotes}
+                      isPending={isPending}
+                      onSubmit={handleAssignSubmit}
+                    />
+                    <DialogFooter>
+                      <Button size="lg" className="w-full" disabled={isPending || !selectedPerson} onClick={handleAssignSubmit}>
+                        {isPending ? 'Saving…' : 'Assign'}
+                      </Button>
+                    </DialogFooter>
+                  </TabsContent>
+                  <TabsContent value="reserve">
+                    <ReserveForm
+                      notes={reserveNotes} onNotes={setReserveNotes}
+                      team={reserveTeam} onTeam={setReserveTeam}
+                      teams={teams} isPending={isPending}
+                      onSubmit={() => run(() => reserveSeat(seat.id, reserveNotes.trim(), reserveTeam.trim()), 'Seat has been reserved.')}
+                    />
+                    <DialogFooter>
+                      <Button size="lg" className="w-full" disabled={isPending} onClick={() => run(() => reserveSeat(seat.id, reserveNotes.trim(), reserveTeam.trim()), 'Seat has been reserved.')}>
+                        {isPending ? 'Saving…' : 'Reserve'}
+                      </Button>
+                    </DialogFooter>
+                  </TabsContent>
+                </Tabs>
+              ) : (
+                <p className="text-sm text-muted-foreground py-4">This seat is available.</p>
+              )}
+            </>
           )}
 
           {/* ── OCCUPIED: view ── */}
@@ -377,19 +384,21 @@ export function SeatModal({ seat, teams, divisions, unseatedPeople, initialPerso
                         </span>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      className="text-xs text-muted-foreground underline"
-                      onClick={enterEdit}
-                    >
-                      Change
-                    </button>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        className="text-xs text-muted-foreground underline"
+                        onClick={enterEdit}
+                      >
+                        Change
+                      </button>
+                    )}
                   </div>
                 </Field>
                 <Field>
                   <div className="flex items-center justify-between">
                     <FieldLabel>Notes</FieldLabel>
-                    {!editingNotes && (
+                    {canEdit && !editingNotes && (
                       <button
                         type="button"
                         className="text-xs text-muted-foreground underline"
@@ -424,13 +433,15 @@ export function SeatModal({ seat, teams, divisions, unseatedPeople, initialPerso
                   )}
                 </Field>
               </FieldGroup>
-              <DialogFooter>
-                <div className="flex gap-2 w-full">
-                  <Button size="lg" variant="outline" className="flex-1" onClick={() => { close(); onMoveStart(seat) }}>Move</Button>
-                  <Button size="lg" variant="outline" className="flex-1" disabled={isPending}
-                    onClick={() => run(() => unassignSeat(seat.id), 'Seat has been unassigned.')}>Unassign</Button>
-                </div>
-              </DialogFooter>
+              {canEdit && (
+                <DialogFooter>
+                  <div className="flex gap-2 w-full">
+                    <Button size="lg" variant="outline" className="flex-1" onClick={() => { close(); onMoveStart(seat) }}>Move</Button>
+                    <Button size="lg" variant="outline" className="flex-1" disabled={isPending}
+                      onClick={() => run(() => unassignSeat(seat.id), 'Seat has been unassigned.')}>Unassign</Button>
+                  </div>
+                </DialogFooter>
+              )}
             </>
           )}
 
@@ -466,11 +477,13 @@ export function SeatModal({ seat, teams, divisions, unseatedPeople, initialPerso
                   </p>
                 )}
               </div>
-              <DialogFooter>
-                <Button size="lg" onClick={enterAssign}>Assign person</Button>
-                <Button size="lg" variant="outline" disabled={isPending}
-                  onClick={() => run(() => makeAvailable(seat.id), 'Seat has been made available.')}>Make available</Button>
-              </DialogFooter>
+              {canEdit && (
+                <DialogFooter>
+                  <Button size="lg" onClick={enterAssign}>Assign person</Button>
+                  <Button size="lg" variant="outline" disabled={isPending}
+                    onClick={() => run(() => makeAvailable(seat.id), 'Seat has been made available.')}>Make available</Button>
+                </DialogFooter>
+              )}
             </>
           )}
 

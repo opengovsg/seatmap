@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 
-export type AdminRole = 'owner' | 'admin'
-export type UserRole = 'owner' | 'admin' | 'user'
+export type AdminRole = 'owner' | 'admin' | 'editor'
+export type UserRole = 'owner' | 'admin' | 'editor' | 'user'
 
 export interface AdminRecord {
   email: string
@@ -32,6 +32,19 @@ export async function getUserRole(email: string): Promise<UserRole> {
   const record = await getAdminRecord(email)
   if (!record) return 'user'
   return record.role
+}
+
+// Role hierarchy: owner > admin > editor > user
+const ROLE_HIERARCHY = { owner: 3, admin: 2, editor: 1, user: 0 }
+
+export async function isEditor(email: string): Promise<boolean> {
+  const role = await getUserRole(email)
+  return ROLE_HIERARCHY[role] >= ROLE_HIERARCHY.editor
+}
+
+export async function addEditor(email: string): Promise<void> {
+  const { error } = await db().from('admins').insert({ email, role: 'editor' })
+  if (error) throw new Error(error.message)
 }
 
 export async function listAdmins(): Promise<AdminRecord[]> {
